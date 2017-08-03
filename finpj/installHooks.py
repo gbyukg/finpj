@@ -49,7 +49,7 @@ def run_script(func_name, *args, **kvargs):
     )
     '''
     cmd = "{}/install_hook.sh {} {}".format(
-        os.path.split(os_modules['__main__'].__file__)[0],
+        os_modules['__main__'].sys.path[0],
         func_name,
         kvargs.get('cus_param', '')
     )

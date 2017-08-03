@@ -7,7 +7,7 @@ Created on 2017年7月24日
 
 
 from socket import gethostname
-from os.path import split as os_path_split
+#from os.path import split as os_path_split
 from os import getenv as os_getenv
 import sys
 import ConfigParser
@@ -20,7 +20,7 @@ Load configurations from config file
 
 class GetConfigs(object):
     '''Load configurations from config file'''
-    project_dir = os_path_split(sys.modules['__main__'].__file__)[0]
+    project_dir = sys.modules['__main__'].sys.path[0]
     # 其实不需要使用 try 来判断 configParrser 是否已经存在
     try:
         GetConfigs.configParrser
@@ -44,21 +44,16 @@ class GetConfigs(object):
             confs = cls.configParrser.items(section)
         except ConfigParser.NoSectionError:
             if len(cls.loaded_config_file) == 0:
-                pass
+                raise ConfigParser.NoSectionError('No configuration file find.')
             else:
-                print(
-                    'Load config file failed: No section [{}]\n'
-                    'Config file: {}'.format(
+                msg = 'Load config file failed: No section [{}]\nConfig file: {}'.format(
                         section,
                         cls.loaded_config_file)
-                    )
-            return False
+                raise ConfigParser.NoSectionError(msg)
         except ConfigParser.InterpolationSyntaxError as e:
-            print(e)
-            return False
+            raise ConfigParser.InterpolationSyntaxError("Config file syntax error: {}".format(e))
         except Exception as e:
-            print(e)
-            return False
+            raise Exception(e)
 
         # https://stackoverflow.com/questions/5466618/too-many-values-to-unpack-iterating-over-a-dict-key-string-value-list
         # 环境变量(大写)优先于配置文件
