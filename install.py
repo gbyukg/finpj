@@ -19,12 +19,28 @@ class Install(object):
         # 合并配置文件中读取的配置和命令行指定的选项
         self.install_config = dict(GetConfigs.get_all_configs(kvargs['conf_section']).items() + kvargs.items())
         
-        # restore_install: True 数据库恢复而来, 安装时不需要初始化数据库, dataloader
-        if self.install_config['restore_install']:
+        # 设置 tmp 目录
+        self.__setup_tmpdir()
+        
+        # install_method:
+        #   True:  --full-install 数据库恢复而来, 安装时不需要初始化数据库, dataloader
+        #   False: --restore-install
+        if not self.install_config['install_method']:
             self.install_config['init_db'] = False
             self.install_config['data_loader'] = False
         
-        self.__setup_tmpdir()
+        # 如果实例将被用作基础数据库, 将总是执行 init_db 和 dataloader
+        if self.install_config['as_base_db']:
+            self.install_config['init_db'] = True
+            self.install_config['data_loader'] = True
+        
+        # 设置 dataloader 目录, git 与 package dataloader 路径不同
+        # package: False 0
+        # git: True 1
+        # [self.install_config['source_from']]
+        self.install_config['dataloader_dir'] = ('package',
+                                                 "{:s}/ibm/dataloaders".format(self.install_config['git_dir'])
+                                                 )[self.install_config['source_from']]
         
         # 将配置文件写入到文件中, 当做环境变量传递给shell脚本
         env_file="{:s}/env.sh".format(self.install_config['tmp_dir'])
@@ -189,7 +205,7 @@ def parse_args():
     arg_install_method_group.add_argument(
         '--restore-install',
         action='store_false',
-        dest='restore_install',
+        dest='install_method',
         help='Restore SC and DataBase')
     arg_install_sc.add_argument(
         '--db-source',
@@ -277,9 +293,22 @@ def parse_args():
         dest='independent_es',
     )
     arg_install_sc.add_argument(
+        '--as-base-db',
+        action='store_true',
+        dest='as_base_db',
+        help='As a DB base image'
+    )
+    arg_install_sc.add_argument(
+        '--qrr',
+        action='store_true',
+        dest='qrr_after_install',
+        help='Run QRR after install'
+    )
+    arg_install_sc.add_argument(
         '--cus-install-hook',
         action='store',
         dest='cus_install_hook',
+        help='custom install hook script'
     )
     arg_install_sc.add_argument(
         '--debug',

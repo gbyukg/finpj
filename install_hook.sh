@@ -115,19 +115,48 @@ prepare_source_from_pr()
     after_prepare_code
 }
 
+init_db()
+{
+    echo "Creating database ${DB_NAME}..."
+
+    db2 "CREATE DATABASE ${DB_NAME} USING CODESET UTF-8 TERRITORY US COLLATE USING UCA500R1_LEN_S2 PAGESIZE 32 K" # create the database from scratch and enable case-insensitive collation
+    db2 "CONNECT TO ${DB_NAME}" # make a connection to update the parameters below
+    db2 "UPDATE database configuration for ${DB_NAME} using applheapsz 32768 app_ctl_heap_sz 8192"
+    db2 "UPDATE database configuration for ${DB_NAME} using stmtheap 60000"
+    db2 "UPDATE database configuration for ${DB_NAME} using locklist 50000"
+    db2 "UPDATE database configuration for ${DB_NAME} using indexrec RESTART"
+    db2 "UPDATE database configuration for ${DB_NAME} using logfilsiz 1000"
+    db2 "UPDATE database configuration for ${DB_NAME} using logprimary 12"
+    db2 "UPDATE database configuration for ${DB_NAME} using logsecond 30"
+    db2 "UPDATE database configuration for ${DB_NAME} using DATABASE_MEMORY AUTOMATIC" #Prevent memory exceeding
+    db2 "UPDATE database configuration for ${DB_NAME} using extended_row_sz enable"
+    db2 "UPDATE database configuration for ${DB_NAME} using PCKCACHESZ 128000"
+    db2 "UPDATE database configuration for ${DB_NAME} using CATALOGCACHE_SZ 400"
+    db2set DB2_COMPATIBILITY_VECTOR=4008
+    db2 "CREATE BUFFERPOOL SUGARBP IMMEDIATE  SIZE 1000 AUTOMATIC PAGESIZE 32 K"
+    db2 "CREATE  LARGE  TABLESPACE SUGARTS PAGESIZE 32 K  MANAGED BY AUTOMATIC STORAGE EXTENTSIZE 32 OVERHEAD 10.5 PREFETCHSIZE 32 TRANSFERRATE 0.14 BUFFERPOOL SUGARBP"
+    db2 "CREATE USER TEMPORARY TABLESPACE SUGARXGTTTS IN DATABASE PARTITION GROUP IBMDEFAULTGROUP PAGESIZE 32K MANAGED BY AUTOMATIC STORAGE EXTENTSIZE 32 PREFETCHSIZE 32 BUFFERPOOL SUGARBP OVERHEAD 7.5 TRANSFERRATE 0.06 NO FILE SYSTEM CACHING"
+
+    if [[ "${AS_BASE_DB}" == 'True' ]]; then
+        db2 "UPDATE database configuration for $DB_NAME using LOGARCHMETH1 LOGRETAIN"
+        # 需要一次全量备份, 才能使用数据库
+        db2 "backup db $DB_NAME to ${DBSOURCE_DIR}" || \
+            __err "$LINENO" "Full DB backup failed."
+        # 删除此次备份, 备份只为了能够使用这个数据库
+        rm -rf "${DB_NAME}*"
+    fi
+    exit 1
+}
+
 backup_db()
 {
-    db2 "UPDATE database configuration for $DBNAME using LOGARCHMETH1 LOGRETAIN"
-    db2 backup db taq to /home/btit/db2backup/
-    db2 backup db taq online to /home/btit/db2backup/ without prompting
-    db2 restore db taq taken at 20170726100035 into zzlzhang without prompting
-    db2 rollforward db zzlzhang
+    echo "Backuping DB ${DB_NAME} ..."
+    db2 "backup db ${DB_NAME} online to ${DBSOURCE_DIR} without prompting"
 }
 
 db_restore()
 {
-    # DB_SOURCE
-    # db2 restore db saleconn from ${DBSOURCE_DIR} taken at 20170802130539 into DB_1 without prompting
+
     echo "Restoring DB from [${DB_SOURCE}] into [${DB_NAME}]..."
     __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "db2 restore db ${DB_SOURCE} from ${DBSOURCE_DIR} into ${DB_NAME} without prompting"
     __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "db2 rollforward database ${DB_NAME} complete"
@@ -166,6 +195,68 @@ update_conf()
     __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "sed 's/\^INSTANCE_NAME\^/${INSTANCE_NAME}/g' ./configs/htaccess > ${WEB_DIR}/${INSTANCE_NAME}/.htaccess"
 }
 
+run_avl()
+{
+    echo 'Importing AVL...'
+
+    cd "${WEB_DIR}/${INSTANCE_NAME}/custom/cli" || __err "$LINENO" "SC instance directory [${WEB_DIR}/${INSTANCE_NAME}] not exists."
+
+    green_echo "Importing avl.csv..."
+    php cli.php task=Avlimport file="${WEB_DIR}/${INSTANCE_NAME}"/custom/install/avl.csv idlMode=true
+
+    for avl_file in ${WEB_DIR}/${INSTANCE_NAME}/custom/install/avl/*.csv; do
+        green_echo "Importing ${avl_file}..."
+        php cli.php task=Avlimport file="${avl_file}"
+    done
+
+    php cli.php task=AVLRebuildFile
+}
+
+run_dataloader()
+{
+    echo "Run dataloader..."
+
+    __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Run hook [run_dataloader]"
+
+    # DATALOADER_DIR 定义在 install.py
+    cd "${DATALOADER_DIR}" || __err "$LINENO" "Dataloader folder [${DATALOADER_DIR}] not exists."
+
+    [[ -f config.php ]] || __err "$LINENO" "Current directory [${PWD}] is not a validated dataloader folder."
+
+    cat <<CONFIG > config.php
+<?php
+
+\$config = array(
+
+    // DB settings
+    'db' => array(
+        'type' => 'db2', // mysql or db2
+        'host' => '${DB_HOST}',
+        'port' => '${DB_PORT}',
+        'username' => '${DB_ADMIN_USR}',
+        'password' => '${DB_ADMIN_PWD}',
+        'name' => '${DB_NAME}',
+    ),
+
+    // default bean field/values used by Utils_Db::createInsert()
+    'bean_fields' => array(
+        'created_by' => '1',
+        'date_entered' => '2012-01-01 00:00:00',
+        'modified_user_id' => '1',
+        'date_modified' => '2012-01-01 00:00:00',
+    ),
+
+    // sugarcrm
+    'sugarcrm' => array(
+        // full path of the installed sugarcrm instance
+        'directory' => '${WEB_DIR}/${INSTANCE_NAME}',
+    ),
+
+);
+CONFIG
+    php populate_SmallDataset.php
+}
+
 before_install_restore()
 {
     echo 'before_install_restore'
@@ -181,13 +272,21 @@ after_install_restore()
 
 before_install_sbs()
 {
-    # echo $@
-    echo 'before_install_sbs'
+    [[ "${INIT_DB}" == 'True' ]] && init_db
 }
 
 after_install_sbs()
 {
-    echo 'after_install_sbs'
+    # run dataloader
+    [[ "${DATA_LOADER}" == 'True' ]] && run_dataloader
+
+    # run AVL
+    [[ "${AVL}" == 'True' ]] && run_avl
+
+    # 是否要跑 QRR, 应该在数据库备份之前
+    [[ "${QRR_AFTER_INSTALL}" == 'True' ]] && run_qrr
+
+    [[ "${AS_BASE_DB}" == 'True' ]] && backup_db
 }
 
 __main()

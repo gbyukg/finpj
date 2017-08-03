@@ -7,6 +7,7 @@ Created on 2017年7月24日
 
 import requests
 from InstallHooks import installHooks
+from Common import print_msg
 
 __all__ = [
     'InstallFailedException',
@@ -30,6 +31,8 @@ class InstallSC(object):
 
     def __call__(self, *args, **kvargs):
         try:
+            # --full-install: True 1
+            # --restore-install : False 0
             return (self.install_from_restore, self.install_step_by_step)[self.approach](*args, **kvargs)
         except KeyError:
             raise InstallFailedException(
@@ -38,6 +41,7 @@ class InstallSC(object):
 
     @installHooks('install_sbs')
     def install_step_by_step(self, *args, **kvargs):
+        print_msg("Install Step by Step")
         try:
             kvargs['instance_url'] = '{}/{}'.format(kvargs['web_host'], kvargs['instance_name'])
             kvargs['install_url'] = '{}/install.php'.format(kvargs['instance_url'])
@@ -154,17 +158,19 @@ class InstallSC(object):
             raise InstallFailedException("Error: [install_step_by_step] can not find config key: {}".format(e))
         except Exception as e:
             raise InstallFailedException("Error: [install_step_by_step] {}".format(e))
-        return 0
+
         reqSessiong = requests.Session()
         reqSessiong.get(kvargs['install_url'])
+        i = 0
         for step in iter(self.install_steps_data):
-            print(step)
+            print_msg("Current step [{:d}]", i+1)
             response = reqSessiong.post(kvargs['install_url'], data=step)
             if not response.ok:
                 response.raise_for_status()
 
     @installHooks('install_restore')
     def install_from_restore(self, *args, **kvargs):
+        print_msg("Install from restore")
         pass
         # run_script('install_from_restore')
 
