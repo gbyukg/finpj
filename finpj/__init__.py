@@ -7,7 +7,7 @@ __all__ = [
     "InstallSC",
     "InstallFailedException",
     "GetConfigs",
-    "InstallHooks",
+    "installHooks",
     "run_script",
     "print_msg",
     "print_err"

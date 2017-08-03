@@ -105,7 +105,7 @@ prepare_source_from_pr()
     __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "git reset --hard"
     __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "git clean -fdx"
 
-    #__command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "git fetch ${git_refs}" #|| __err "$LINENO" "git fetch failed."
+    __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "git fetch ${git_refs}" #|| __err "$LINENO" "git fetch failed."
     __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "git checkout -f ${check_ref}"
     [[ -n "${merge_ref}" ]] && __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "git merge --squash ${merge_ref}"
 

@@ -6,7 +6,7 @@ Created on 2017年7月24日
 '''
 
 import requests
-from InstallHooks import installHooks, run_script
+from InstallHooks import installHooks
 
 __all__ = [
     'InstallFailedException',
