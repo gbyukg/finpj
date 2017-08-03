@@ -48,9 +48,9 @@ build_code()
     __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Run hook [build_code]"
 
     echo "building code..."
-    # __command_logging_and_exit \
-        # "$FUNCNAME" "$LINENO" \
-        # "cd ${GIT_DIR}/build/rome && php build.php -clean -cleanCache -flav=ult -ver='7.1.5' -dir=sugarcrm -build_dir=${BUILD_DIR}"
+    __command_logging_and_exit \
+        "${FUNCNAME[0]}" "$LINENO" \
+        "cd ${GIT_DIR}/build/rome && php build.php -clean -cleanCache -flav=ult -ver='7.1.5' -dir=sugarcrm -build_dir=${BUILD_DIR}"
 
     [[ -d "${WEB_DIR}/${INSTANCE_NAME}" ]] && __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "rm -rf ${WEB_DIR}/${INSTANCE_NAME}"
     __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "mv ${BUILD_DIR}/ult/sugarcrm ${WEB_DIR}/${INSTANCE_NAME}"
@@ -208,8 +208,5 @@ readonly -f __main
 readonly -f __logging
 readonly -f __err
 readonly -f __command_logging_and_exit
-
-update_conf
-exit 0
 
 __main "$@"

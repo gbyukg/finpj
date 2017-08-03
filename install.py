@@ -9,7 +9,7 @@ from __future__ import print_function
 import os
 import sys
 import requests
-#from json import loads as jsloads
+import datetime
 from argparse import ArgumentParser
 from finpj import InstallSC, InstallFailedException, GetConfigs, run_script
 
@@ -19,6 +19,8 @@ class Install(object):
         # https://stackoverflow.com/questions/38987/how-to-merge-two-python-dictionaries-in-a-single-expression
         # 合并配置文件中读取的配置和命令行指定的选项
         self.install_config = dict(GetConfigs.get_all_configs(kvargs['conf_section']).items() + kvargs.items())
+        
+        self.__setup_tmpdir()
         
         # 将配置文件写入到文件中, 当做环境变量传递给shell脚本
         env_file="{:s}/env.sh".format(self.install_config['tmp_dir'])
@@ -31,6 +33,22 @@ class Install(object):
         os.environ["BASH_ENV"] = env_file
 
         self.install_sc()
+    
+    def __setup_tmpdir(self):
+        keep_live = int(self.install_config['keep_alive'])
+        # 因为一直是当天的凌晨做清理操作, 所有默认在追加一天
+        time_dir = (datetime.datetime.today() + datetime.timedelta(days=keep_live+1)).strftime("%Y-%m-%d")
+        
+        print("The instance will be deleted on {0:s}".format(time_dir))
+        tmp_dir = "{0:s}/{1:s}/{2:s}".format(self.install_config['tmp_path'],
+                                              time_dir,
+                                              self.install_config["instance_name"])
+        if not os.path.exists(tmp_dir):
+            os.makedirs(tmp_dir)
+        
+        # 追加到 config 配置中
+        self.install_config["tmp_dir"] = tmp_dir
+        self.install_config["log_file"] = "{}/install.log".format(tmp_dir)
     
     def _prepare_source_code(func):
         # 此处代码在文件被加载时就已经被执行, 因此此处并无 self 变量
@@ -205,6 +223,7 @@ def parse_args():
         action='store',
         dest='keep_alive',
         type=int,
+        choices=range(1, 30),
         default=3,
     )
     
