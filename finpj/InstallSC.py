@@ -162,8 +162,8 @@ class InstallSC(object):
         reqSessiong = requests.Session()
         reqSessiong.get(kvargs['install_url'])
         i = 0
-        for step in iter(self.install_steps_data):
-            print_msg("Current step [{:d}]", i+1)
+        for inx, step in enumerate(self.install_steps_data):
+            print_msg("Current step [{:d}]".format(inx))
             response = reqSessiong.post(kvargs['install_url'], data=step)
             if not response.ok:
                 response.raise_for_status()

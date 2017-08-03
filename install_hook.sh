@@ -61,7 +61,7 @@ after_prepare_code()
     # update composer
     echo "update composer..."
     cd "${GIT_DIR}"/sugarcrm || exit 1
-    COMPOSER_DISABLE_XDEBUG_WARN=1 composer install
+    COMPOSER_DISABLE_XDEBUG_WARN=1 composer update
 }
 
 prepare_source_from_pr()
@@ -103,7 +103,7 @@ prepare_source_from_pr()
     done
 
     __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "git reset --hard"
-    __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "git clean -fdx"
+    __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "git clean -fd"
 
     __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "git fetch ${git_refs}" #|| __err "$LINENO" "git fetch failed."
     __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "git checkout -f ${check_ref}"
@@ -115,9 +115,29 @@ prepare_source_from_pr()
     after_prepare_code
 }
 
+__stop_db_app()
+{
+    circularCount="${1:-0}"
+    # 检查是否还有连接连到该数据库上
+    db2 list applications for database "${DB_NAME}" show detail
+    if [[ $? -eq 0 ]]; then
+        db2 connect to "${DB_NAME}" && \
+        db2 QUIESCE DATABASE IMMEDIATE FORCE CONNECTIONS
+        db2 CONNECT RESET
+        sleep 2
+        circularCount=$((circularCount + 1))
+        [[ "$circularCount" -eq 6 ]] && return
+        __stop_db_app circularCount
+    fi
+}
+
 init_db()
 {
     echo "Creating database ${DB_NAME}..."
+
+    [[ $(db2 list db directory | grep "${DB_NAME} > /dev/null 2&>1"; echo $?) -ne 0 ]] &&\
+        __stop_db_app && \
+        db2 drop database "${DB_NAME}"
 
     db2 "CREATE DATABASE ${DB_NAME} USING CODESET UTF-8 TERRITORY US COLLATE USING UCA500R1_LEN_S2 PAGESIZE 32 K" # create the database from scratch and enable case-insensitive collation
     db2 "CONNECT TO ${DB_NAME}" # make a connection to update the parameters below
@@ -139,19 +159,22 @@ init_db()
 
     if [[ "${AS_BASE_DB}" == 'True' ]]; then
         db2 "UPDATE database configuration for $DB_NAME using LOGARCHMETH1 LOGRETAIN"
+
+        __stop_db_app
+
         # 需要一次全量备份, 才能使用数据库
         db2 "backup db $DB_NAME to ${DBSOURCE_DIR}" || \
             __err "$LINENO" "Full DB backup failed."
         # 删除此次备份, 备份只为了能够使用这个数据库
-        rm -rf "${DB_NAME}*"
+        rm -rf "${DBSOURCE_DIR}/${DB_NAME}"*
     fi
-    exit 1
 }
 
 backup_db()
 {
     echo "Backuping DB ${DB_NAME} ..."
     db2 "backup db ${DB_NAME} online to ${DBSOURCE_DIR} without prompting"
+    db2ckbkp -h "${DBSOURCE_DIR}"/"${DB_NAME}".*
 }
 
 db_restore()
