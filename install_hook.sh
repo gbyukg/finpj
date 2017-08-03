@@ -146,7 +146,7 @@ run_qrr()
     local qrr_scripts[6]='runRebuildSprites.php'
     local qrr_scripts[7]='runRepairRelationships.php'
 
-    __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "cd ${WEB_DIR}/${INSTANCE_NAME}"
+    cd "${WEB_DIR}/${INSTANCE_NAME}" || __err "$LINENO" "SC instance directory [${WEB_DIR}/${INSTANCE_NAME}] not exists."
 
     for script in "${qrr_scripts[@]}"; do
         [[ -f "${script}" ]] && rm -rf "${script}"

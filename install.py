@@ -5,13 +5,12 @@ Created on 2017年7月24日
 @author: zzlzhang@cn.ibm.com
 '''
 
-from __future__ import print_function
 import os
-import sys
+#import sys
 import requests
 import datetime
 from argparse import ArgumentParser
-from finpj import InstallSC, InstallFailedException, GetConfigs, run_script
+from finpj import InstallSC, InstallFailedException, GetConfigs, run_script, print_msg, print_err
 
 
 class Install(object):
@@ -19,6 +18,11 @@ class Install(object):
         # https://stackoverflow.com/questions/38987/how-to-merge-two-python-dictionaries-in-a-single-expression
         # 合并配置文件中读取的配置和命令行指定的选项
         self.install_config = dict(GetConfigs.get_all_configs(kvargs['conf_section']).items() + kvargs.items())
+        
+        # restore_install: True 数据库恢复而来, 安装时不需要初始化数据库, dataloader
+        if self.install_config['restore_install']:
+            self.install_config['init_db'] = False
+            self.install_config['data_loader'] = False
         
         self.__setup_tmpdir()
         
@@ -39,7 +43,7 @@ class Install(object):
         # 因为一直是当天的凌晨做清理操作, 所有默认在追加一天
         time_dir = (datetime.datetime.today() + datetime.timedelta(days=keep_live+1)).strftime("%Y-%m-%d")
         
-        print("The instance will be deleted on {0:s}".format(time_dir))
+        print_msg("The instance will be deleted on {0:s}".format(time_dir))
         tmp_dir = "{0:s}/{1:s}/{2:s}".format(self.install_config['tmp_path'],
                                               time_dir,
                                               self.install_config["instance_name"])
@@ -56,15 +60,6 @@ class Install(object):
             # git => True
             # package => False
             (self._install_from_package, self._install_from_git)[self.install_config['source_from']]()
-
-            if self.install_config['restore_install']:
-                #self.install_config['install_method'] = 'install_from_restore'
-                self.install_config['init_db'] = False
-                self.install_config['data_loader'] = False
-            else:
-                pass
-                #self.install_config['install_method'] = 'install_step_by_step'
-            
             func(self)
         return wrapper
     
@@ -82,6 +77,7 @@ class Install(object):
         return response.text
     
     def _install_from_git(self):
+        print_msg("****** Install from GIT... ******")
         refs = ''
         for sour in self.install_config['source_code']:
             try:
@@ -112,9 +108,6 @@ class Install(object):
         # build sugar code
         run_script('build_code')
     
-    def _install_from_br(self):
-        pass
-    
     def _install_from_package(self):
         pass
 
@@ -124,7 +117,6 @@ class Install(object):
                一步一步安装 :install_step_by_step
                恢复安装     :install_from_restore, 必须选择要恢复的数据库
         '''
-
         insc = InstallSC(self.install_config['install_method'])
         try:
             insc(**self.install_config)
@@ -301,11 +293,11 @@ def parse_args():
             'install_sc': Install,
         }[args['type']](**args)
     except KeyError as e:
-        print(e, file=sys.stderr)
+        print_err(e)
     except AttributeError as e:
-        print(e, file=sys.stderr)
+        print_err(e)
     except Exception as e:
-        print(e, file=sys.stderr)
+        print_err(e)
         #file=sys.stderr
 
 

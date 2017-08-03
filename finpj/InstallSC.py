@@ -6,7 +6,7 @@ Created on 2017年7月24日
 '''
 
 import requests
-from installHooks import installHooks, run_script
+from InstallHooks import installHooks, run_script
 
 __all__ = [
     'InstallFailedException',
@@ -165,7 +165,8 @@ class InstallSC(object):
 
     @installHooks('install_restore')
     def install_from_restore(self, *args, **kvargs):
-        run_script('install_from_restore')
+        pass
+        # run_script('install_from_restore')
 
 
 if __name__ == '__main__':
