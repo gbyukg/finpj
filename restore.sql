@@ -1,0 +1,119 @@
+-- *****************************************************************************
+-- ** automatically created redirect restore script
+-- *****************************************************************************
+UPDATE COMMAND OPTIONS USING S ON Z ON TAQ_NODE0000.out V ON;
+SET CLIENT ATTACH_MEMBER  0;
+SET CLIENT CONNECT_MEMBER 0;
+-- *****************************************************************************
+-- ** automatically created redirect restore script
+-- *****************************************************************************
+RESTORE DATABASE TAQ
+-- USER  <username>
+-- USING '<password>'
+FROM '/tmp'
+TAKEN AT 20170726083522
+-- ON '/home/btit'
+-- DBPATH ON '<target-directory>'
+INTO TAQ2
+-- LOGTARGET '<directory>'
+-- NEWLOGPATH '/home/btit/btit/NODE0000/SQL00005/LOGSTREAM0000/'
+-- WITH <num-buff> BUFFERS
+-- BUFFER <buffer-size>
+-- REPLACE HISTORY FILE
+-- REPLACE EXISTING
+REDIRECT
+-- PARALLELISM <n>
+-- WITHOUT ROLLING FORWARD
+-- WITHOUT PROMPTING
+;
+-- *****************************************************************************
+-- ** storage group definition
+-- **   Default storage group ID                 = 0
+-- **   Number of storage groups                 = 1
+-- *****************************************************************************
+-- *****************************************************************************
+-- ** Storage group name                         = IBMSTOGROUP
+-- **   Storage group ID                         = 0
+-- **   Data tag                                 = None
+-- *****************************************************************************
+-- SET STOGROUP PATHS FOR IBMSTOGROUP
+-- ON '/home/btit'
+-- ;
+-- *****************************************************************************
+-- ** table space definition
+-- *****************************************************************************
+-- *****************************************************************************
+-- ** Tablespace name                            = SYSCATSPACE
+-- **   Tablespace ID                            = 0
+-- **   Tablespace Type                          = Database managed space
+-- **   Tablespace Content Type                  = All permanent data. Regular table space.
+-- **   Tablespace Page size (bytes)             = 32768
+-- **   Tablespace Extent size (pages)           = 4
+-- **   Using automatic storage                  = Yes
+-- **   Storage group ID                         = 0
+-- **   Source storage group ID                  = -1
+-- **   Data tag                                 = None
+-- **   Auto-resize enabled                      = Yes
+-- **   Total number of pages                    = 7168
+-- **   Number of usable pages                   = 7164
+-- **   High water mark (pages)                  = 6300
+-- *****************************************************************************
+-- *****************************************************************************
+-- ** Tablespace name                            = TEMPSPACE1
+-- **   Tablespace ID                            = 1
+-- **   Tablespace Type                          = System managed space
+-- **   Tablespace Content Type                  = System Temporary data
+-- **   Tablespace Page size (bytes)             = 32768
+-- **   Tablespace Extent size (pages)           = 32
+-- **   Using automatic storage                  = Yes
+-- **   Total number of pages                    = 1
+-- *****************************************************************************
+-- *****************************************************************************
+-- ** Tablespace name                            = USERSPACE1
+-- **   Tablespace ID                            = 2
+-- **   Tablespace Type                          = Database managed space
+-- **   Tablespace Content Type                  = All permanent data. Large table space.
+-- **   Tablespace Page size (bytes)             = 32768
+-- **   Tablespace Extent size (pages)           = 32
+-- **   Using automatic storage                  = Yes
+-- **   Storage group ID                         = 0
+-- **   Source storage group ID                  = -1
+-- **   Data tag                                 = -1
+-- **   Auto-resize enabled                      = Yes
+-- **   Total number of pages                    = 1024
+-- **   Number of usable pages                   = 992
+-- **   High water mark (pages)                  = 96
+-- *****************************************************************************
+-- *****************************************************************************
+-- ** Tablespace name                            = SUGARTS
+-- **   Tablespace ID                            = 3
+-- **   Tablespace Type                          = Database managed space
+-- **   Tablespace Content Type                  = All permanent data. Large table space.
+-- **   Tablespace Page size (bytes)             = 32768
+-- **   Tablespace Extent size (pages)           = 32
+-- **   Using automatic storage                  = Yes
+-- **   Storage group ID                         = 0
+-- **   Source storage group ID                  = -1
+-- **   Data tag                                 = -1
+-- **   Auto-resize enabled                      = Yes
+-- **   Total number of pages                    = 1024
+-- **   Number of usable pages                   = 992
+-- **   High water mark (pages)                  = 96
+-- *****************************************************************************
+-- *****************************************************************************
+-- ** Tablespace name                            = SUGARXGTTTS
+-- **   Tablespace ID                            = 4
+-- **   Tablespace Type                          = System managed space
+-- **   Tablespace Content Type                  = User Temporary data
+-- **   Tablespace Page size (bytes)             = 32768
+-- **   Tablespace Extent size (pages)           = 32
+-- **   Using automatic storage                  = Yes
+-- **   Total number of pages                    = 1
+-- *****************************************************************************
+-- *****************************************************************************
+-- ** start redirected restore
+-- *****************************************************************************
+RESTORE DATABASE TAQ CONTINUE;
+-- *****************************************************************************
+-- ** end of file
+-- *****************************************************************************

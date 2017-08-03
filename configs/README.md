@@ -1,0 +1,11 @@
+config.php
+^SERVER_HOSTNAME^
+^INSTANCE_NAME^
+^DB_NAME^
+^UNIQUE_KEY^
+
+config_override.php
+^SERVER_HOSTNAME^
+
+htaccess
+^INSTANCE_NAME^
