@@ -174,7 +174,6 @@ init_db()
 backup_db()
 {
     echo "Backuping DB ${DB_NAME} ..."
-    # db2 "backup db ${DB_NAME} online to ${DBSOURCE_DIR} without prompting"
     db2 "backup db ${DB_NAME} online to ${DBSOURCE_DIR} with 8 buffers buffer 8192 compress include logs without prompting"
     db2ckbkp -h "${DBSOURCE_DIR}"/"${DB_NAME}".*
 }
@@ -402,23 +401,6 @@ update_conf()
     __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "sed 's/\^INSTANCE_NAME\^/${INSTANCE_NAME}/g' ./configs/htaccess > ${WEB_DIR}/${INSTANCE_NAME}/.htaccess"
 }
 
-run_avl()
-{
-    echo 'Importing AVL...'
-
-    cd "${WEB_DIR}/${INSTANCE_NAME}/custom/cli" || __err "$LINENO" "SC instance directory [${WEB_DIR}/${INSTANCE_NAME}] not exists."
-
-    green_echo "Importing avl.csv..."
-    php cli.php task=Avlimport file="${WEB_DIR}/${INSTANCE_NAME}"/custom/install/avl.csv idlMode=true
-
-    for avl_file in ${WEB_DIR}/${INSTANCE_NAME}/custom/install/avl/*.csv; do
-        green_echo "Importing ${avl_file}..."
-        php cli.php task=Avlimport file="${avl_file}"
-    done
-
-    php cli.php task=AVLRebuildFile
-}
-
 run_dataloader()
 {
     echo "Run dataloader..."
@@ -464,6 +446,39 @@ CONFIG
     php populate_SmallDataset.php
 }
 
+run_avl()
+{
+    echo 'Importing AVL...'
+
+    cd "${WEB_DIR}/${INSTANCE_NAME}/custom/cli" || __err "$LINENO" "SC instance directory [${WEB_DIR}/${INSTANCE_NAME}] not exists."
+
+    green_echo "Importing avl.csv..."
+    php cli.php task=Avlimport file="${WEB_DIR}/${INSTANCE_NAME}"/custom/install/avl.csv idlMode=true
+
+    for avl_file in ${WEB_DIR}/${INSTANCE_NAME}/custom/install/avl/*.csv; do
+        green_echo "Importing ${avl_file}..."
+        php cli.php task=Avlimport file="${avl_file}"
+    done
+
+    php cli.php task=AVLRebuildFile
+}
+
+run_unittest()
+{
+    echo 'Starting to run PHP UNITTEST...'
+    cd "${WEB_DIR}/${INSTANCE_NAME}"/tests
+
+    vendor_unit= "${WEB_DIR}"/"${INSTANCE_NAME}"/vendor/bin/phpunit
+    if [[ -f "${vendor_unit}" ]]; then
+        php "${vendor_unit}"
+    else
+        phpunit
+    fi
+
+    # 总是返回 0
+    exit 0
+}
+
 before_install_restore()
 {
     echo 'before_install_restore'
@@ -490,9 +505,13 @@ after_install_sbs()
     # run AVL
     [[ "${AVL}" == 'True' ]] && run_avl
 
+    # run UnitTest
+    [[ "${UT}" == 'True' ]] && run_unittest
+
     # 是否要跑 QRR, 应该在数据库备份之前
     [[ "${QRR_AFTER_INSTALL}" == 'True' ]] && run_qrr
 
+    # 备份数据库
     [[ "${AS_BASE_DB}" == 'True' ]] && backup_db
 }
 
