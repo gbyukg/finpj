@@ -89,16 +89,17 @@ prepare_source_from_pr()
 
         if [[ "X${info[0]}" == 'Xpr' ]]; then
             git_refs="${git_refs} +refs/pull/*/head:refs/remotes/${info[1]}/pr/*"
-            middle_ref='pr'
+            # 以 / 结尾, git checkout -f sugareps//ibm_r40 将报错, 无法找到匹配
+            middle_ref='pr/'
         else
             git_refs="${git_refs} +refs/heads/*:refs/remotes/${info[1]}/*"
             middle_ref=''
         fi
 
         if [[ -z "${check_ref}" ]]; then
-            check_ref="${info[1]}/${middle_ref}/${info[2]}"
+            check_ref="${info[1]}/${middle_ref}${info[2]}"
         else
-            merge_ref="${merge_ref} ${info[1]}/${middle_ref}/${info[2]}"
+            merge_ref="${merge_ref} ${info[1]}/${middle_ref}${info[2]}"
         fi
     done
 
