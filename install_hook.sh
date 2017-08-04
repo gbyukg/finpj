@@ -174,16 +174,199 @@ init_db()
 backup_db()
 {
     echo "Backuping DB ${DB_NAME} ..."
-    db2 "backup db ${DB_NAME} online to ${DBSOURCE_DIR} without prompting"
+    # db2 "backup db ${DB_NAME} online to ${DBSOURCE_DIR} without prompting"
+    db2 "backup db ${DB_NAME} online to ${DBSOURCE_DIR} with 8 buffers buffer 8192 compress include logs without prompting"
     db2ckbkp -h "${DBSOURCE_DIR}"/"${DB_NAME}".*
 }
 
-db_restore()
-{
+db_restore() {
+    BACKUP_DB_TIMESTAMP=20170804042104
+    BACKUP_FILENAME=SALECONN.0.btit.DBPART000.20170804042104.001
 
-    echo "Restoring DB from [${DB_SOURCE}] into [${DB_NAME}]..."
-    __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "db2 restore db ${DB_SOURCE} from ${DBSOURCE_DIR} into ${DB_NAME} without prompting"
-    __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "db2 rollforward database ${DB_NAME} complete"
+    [[ -d "${DB_RESTORE_LOGPATH}" ]] && rm -rf "${DB_RESTORE_LOGPATH}"
+    [[ -d "${DB_RESTORE_LOGTARGET}" ]] && rm -rf "${DB_RESTORE_LOGTARGET}"
+    [[ -d "${DB_RESTORE_ARTIFACTS_DIR}" ]] && rm -rf "${DB_RESTORE_ARTIFACTS_DIR}"
+
+    mkdir "${DB_RESTORE_LOGPATH}"
+    mkdir "${DB_RESTORE_LOGTARGET}"
+    mkdir "${DB_RESTORE_ARTIFACTS_DIR}"
+
+    local IS_ERROR=0
+    echo -e "\n
+    [INFO] Starting REDIRECT RESTORE from backup (online) file
+    for '${DB_SOURCE}' database
+        into a database with a different name (${DB_NAME})"
+
+        #This db command is going to generate an script with the name "db2_redirect_restore.clp"
+        #under the artifacts folder. This script will be executed in the last step of this process.
+        #As this script is the one that perform the restore action, we need to change some parameters
+        #on it
+        echo -e "\n[INFO] Generating 'Redirect Restore' script..."
+        GENERATE_SCRIPT=$({
+
+        if [ "$(db2ckbkp -H ${DBSOURCE_DIR}/${BACKUP_FILENAME} | grep -c "(Offline)")" -ge 1 ]; then
+            echo -e  "Offline image"
+            db2 "restore db ${DB_SOURCE} from ${DBSOURCE_DIR} TAKEN AT ${BACKUP_DB_TIMESTAMP} INTO ${DB_NAME} REDIRECT generate script ${DB_RESTORE_ARTIFACTS_DIR}/db2_redirect_restore.clp without prompting"
+        else
+            echo -e  "Online image"
+            db2 "restore db ${DB_SOURCE} from ${DBSOURCE_DIR} TAKEN AT ${BACKUP_DB_TIMESTAMP} INTO ${DB_NAME} LOGTARGET ${DB_RESTORE_LOGTARGET} NEWLOGPATH ${DB_RESTORE_LOGPATH} REDIRECT generate script ${DB_RESTORE_ARTIFACTS_DIR}/db2_redirect_restore.clp without prompting"
+        fi
+
+    } 2>&1)
+    IS_ERROR=$?
+    if [ $IS_ERROR -eq 0 ]; then
+        echo -e "[INFO] 'Redirect Restore script' created - SUCCESS"
+    else
+        echo -e "[ERROR] Creation of 'Redirect Restore script' - FAILED
+        ###\n${GENERATE_SCRIPT}\n###"
+    fi
+
+    # Step #1 - update table spaces for the DB_NAME
+    if [ $IS_ERROR -eq 0 ]; then
+        echo -e '\n[INFO] Update Step #1: patching tablespace paths #1 - to new values ...'
+        VALUES_UPDATE=$({
+        sed "s@/${DB_SOURCE}@/${DB_NAME}@g" "${DB_RESTORE_ARTIFACTS_DIR}/db2_redirect_restore.clp" > "${DB_RESTORE_ARTIFACTS_DIR}/db2_tmp_modified_script_0"
+    } 2>&1)
+    IS_ERROR=$?
+    if [ $IS_ERROR -eq 0 ]; then
+        echo -e '[INFO] Step #1 Update completed - SUCCESS'
+        DB_SCRIPT_TO_RUN="${DB_RESTORE_ARTIFACTS_DIR}/db2_tmp_modified_script_0"
+    else
+        echo -e "[ERROR] Step #1: FAILED to complete
+        ###\n${VALUES_UPDATE}\n###"
+    fi
+fi
+
+# Step #2 - additional replace for paths with db name inlowercase
+if [ $IS_ERROR -eq 0 ]; then
+    echo -e '\n[INFO] Update Step #2: patching tablespace paths #2 - to new values (in lowercase)...'
+    BACKUP_DB_NAME_LC=$(echo ${DB_SOURCE} | tr '[:upper:]' '[:lower:]')
+    LOW_VALUES_UPDATE=$({
+    sed "s@/${BACKUP_DB_NAME_LC}@/${DB_NAME}@g" "${DB_RESTORE_ARTIFACTS_DIR}/db2_tmp_modified_script_0" > "${DB_RESTORE_ARTIFACTS_DIR}/db2_tmp_modified_script_1"
+} 2>&1)
+IS_ERROR=$?
+if [ $IS_ERROR -eq 0 ]; then
+    echo -e '[INFO] Step #2 Update completed - SUCCESS'
+    DB_SCRIPT_TO_RUN="${DB_RESTORE_ARTIFACTS_DIR}/db2_tmp_modified_script_1"
+else
+    echo -e "[ERROR] Step #2: FAILED to complete
+    ###\n${LOW_VALUES_UPDATE}\n###"
+fi
+  fi
+
+  # Step #3 - disable WITHOUT ROLLING FORWARD
+  if [ $IS_ERROR -eq 0 ]; then
+      echo -e "\n[INFO] Update Step #3: disabling WITHOUT ROLLING FORWARD piece in the 'Redirect Restore' script..."
+      DISABLE_UPDATE=$({
+      sed "s@WITHOUT ROLLING FORWARD@-- WITHOUT ROLLING FORWARD@g" "${DB_RESTORE_ARTIFACTS_DIR}/db2_tmp_modified_script_1" > "${DB_RESTORE_ARTIFACTS_DIR}/db2_tmp_modified_script_2"
+  } 2>&1)
+  IS_ERROR=$?
+  if [ $IS_ERROR -eq 0 ]; then
+      echo '[INFO] Step #3 Update completed - SUCCESS'
+      DB_SCRIPT_TO_RUN="${DB_RESTORE_ARTIFACTS_DIR}/db2_tmp_modified_script_2"
+  else
+      echo -e "[ERROR] Step #3: FAILED to complete
+      ###\n${DISABLE_UPDATE}\n###"
+  fi
+  fi
+
+  # Step #4 - Enable StorageGroup paths for LobGroup creation
+  if [ $IS_ERROR -eq 0 ]; then
+      echo -e "\n[INFO] Update Step #4: enabling SET STOGROUP PATHS FOR IBMLOBGROUP piece in the 'Redirect Restore' script..."
+
+      # Get Line Number of 1st Line of the DB command to be enabled
+      UNCOMMENT_LINE_FROM=$(awk '/SET STOGROUP PATHS FOR IBMLOBGROUP/{print NR; exit}' "${DB_RESTORE_ARTIFACTS_DIR}/db2_tmp_modified_script_2" 2>&1)
+      IS_ERROR=$?
+      if [ $IS_ERROR -eq 0 ]; then
+          # Double check if above Line was found Before continute further in this step
+          if [[ ( -z "${UNCOMMENT_LINE_FROM}" ) || ( $UNCOMMENT_LINE_FROM -eq 0 ) ]]; then
+              echo -e "\n[INFO] Line: '/SET STOGROUP PATHS FOR IBMLOBGROUP/'
+              was NOT FOUND in file: '${DB_RESTORE_ARTIFACTS_DIR}/db2_tmp_modified_script_2'
+              Above DB2 Command is NOT REQUIRED for this Restore process."
+          else
+              # Set the Line Number to uncomment TO
+              UNCOMMENT_LINE_TO=$(( UNCOMMENT_LINE_FROM + 2 ))
+              SCRIPT_UPDATE=$({
+              sed "${UNCOMMENT_LINE_FROM},${UNCOMMENT_LINE_TO}s/-- //g" "${DB_RESTORE_ARTIFACTS_DIR}/db2_tmp_modified_script_2" > "${DB_RESTORE_ARTIFACTS_DIR}/db2_tmp_modified_script_3"
+          } 2>&1)
+          IS_ERROR=$?
+          if [ $IS_ERROR -eq 0 ]; then
+              echo -e "\n\t[INFO] Script Updated - SUCCESS"
+              DB_SCRIPT_TO_RUN="${DB_RESTORE_ARTIFACTS_DIR}/db2_tmp_modified_script_3"
+              # Get Path for LOB directory to be created/prepared
+              LOB_DIR_LINE_NUM=$(( UNCOMMENT_LINE_FROM + 1 ))
+              EXTRACT_LOB_DIR_PATH=".*'\(.*\)'.*$"
+              LOB_DIR_TO_CREATE=$(sed "${LOB_DIR_LINE_NUM}s/${EXTRACT_LOB_DIR_PATH}/\1/g; ${LOB_DIR_LINE_NUM}!d" "${DB_RESTORE_ARTIFACTS_DIR}/db2_tmp_modified_script_3" 2>&1)
+              IS_ERROR=$?
+              if [ $IS_ERROR -eq 0 ]; then
+                  echo -e "\n\t[INFO] Preparing LOB directory: '${LOB_DIR_TO_CREATE}'..."
+                  # create directory
+                  if [ ! -d "${LOB_DIR_TO_CREATE}" ]; then
+                      echo -e "\t       Creating Directory: '${LOB_DIR_TO_CREATE}'..."
+                      DIR_CREATE=$(mkdir -p "${LOB_DIR_TO_CREATE}" 2>&1)
+                      IS_ERROR=$?
+                      if [ $IS_ERROR -eq 0 ]; then
+                          echo -e '\t       Done'
+                      else # ERROR in directory creation
+                          echo -e "\t       [ERROR] There was a problem with Directory Creation!
+                          ###\n${DIR_CREATE}\n###"
+                      fi
+                      # clean directory contents
+                  else
+                      echo -e "\t       Cleaning directory's contents..."
+                      DIR_CLEANUP=$(rm -rf "${LOB_DIR_TO_CREATE:?}/*" 2>&1)
+                      IS_ERROR=$?
+                      if [ $IS_ERROR -eq 0 ]; then
+                          echo -e '\t       Done'
+                      else # ERROR in directory cleanup
+                          echo -e "\t       [ERROR] There was a problem with Directory Cleanup
+                          ###\n${DIR_CLEANUP}\n###"
+                      fi
+                  fi
+                  # end of directory preparation
+              else # ERROR in obtaining directory to prepare
+                  echo -e "\n\t[ERROR] There was a problem with extracting of LOB directory to be prepared
+                  \t        from file: '${DB_RESTORE_ARTIFACTS_DIR}/db2_tmp_modified_script_3'
+                  ###\n${LOB_DIR_TO_CREATE}\n###"
+              fi
+          else # ERROR in Script Update
+              echo -e "[ERROR] There was problem with uncommenting
+              lines: '${UNCOMMENT_LINE_FROM} - ${UNCOMMENT_LINE_TO}'
+              from File: '${DB_RESTORE_ARTIFACTS_DIR}/db2_tmp_modified_script_2'
+              ###\n${SCRIPT_UPDATE}\n###"
+          fi
+      fi
+  else # ERROR in obtaining Line FROM
+      echo -e "[ERROR] Error in getting line number
+      for Line: 'SET STOGROUP PATHS FOR IBMLOBGROUP'
+          from File: '${DB_RESTORE_ARTIFACTS_DIR}/db2_tmp_modified_script_2'
+          ###\n${UNCOMMENT_LINE_FROM}\n###"
+      fi
+
+      if [ $IS_ERROR -eq 0 ]; then
+          echo -e '\n[INFO] Step #4: Update completed - SUCCESS'
+      else
+          echo -e '[ERROR] Step #4: FAILED to complete'
+      fi
+  fi # END of Step 4
+
+  # Final Check for ERRORs or run Redirect Restore Script
+  if [ $IS_ERROR -eq 0 ]; then
+      echo -e "\n[INFO] Running Redirect Restore
+      script: '${DB_RESTORE_ARTIFACTS_DIR}/db2_tmp_modified_script_3'
+      to restore backup into new database: '${DB_NAME}'..."
+      db2 -tf "${DB_SCRIPT_TO_RUN}"
+      RETURN_CODE=$?
+      echo -e "[INFO] Done with return state (${RETURN_CODE})"
+      db2 -v "rollforward db $DB_NAME to end of logs and stop overflow log path ($DB_RESTORE_LOGTARGET)"
+      return $RETURN_CODE
+  else
+      echo -e "\n[ERROR] REDIRECT RESTORE from backup (online) FAILED to complete\n"
+      #    delete_residual_files_from_cloning
+      # DB2 ERROR Status is >= 4
+      # Return a higher enough ERROR to not confuse it with DB2 warning
+      return 225
+  fi
 }
 
 run_qrr()
