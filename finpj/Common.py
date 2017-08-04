@@ -13,6 +13,10 @@ __all__ = [
     'print_err'
 ]
 
+def print_headder_msg(*args, **kwargs):
+    print("******** {:s} ********".format(*args), **kwargs)
+    sys.stdout.flush()
+
 def print_msg(*args, **kwargs):
     print(*args, **kwargs)
     sys.stdout.flush()

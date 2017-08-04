@@ -7,7 +7,7 @@ Created on 2017年7月24日
 
 import requests
 from InstallHooks import installHooks
-from Common import print_msg
+from Common import print_msg, print_headder_msg
 
 __all__ = [
     'InstallFailedException',
@@ -41,7 +41,7 @@ class InstallSC(object):
 
     @installHooks('install_sbs')
     def install_step_by_step(self, *args, **kvargs):
-        print_msg("Install Step by Step")
+        print_headder_msg("Starting to install Step by Step")
         try:
             kvargs['instance_url'] = '{}/{}'.format(kvargs['web_host'], kvargs['instance_name'])
             kvargs['install_url'] = '{}/install.php'.format(kvargs['instance_url'])
