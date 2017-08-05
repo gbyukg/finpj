@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # encoding: utf-8
 '''
 Created on 2017年7月24日
@@ -9,8 +10,24 @@ import os
 import sys
 import requests
 import datetime
-from argparse import ArgumentParser
-from finpj import InstallSC, InstallFailedException, GetConfigs, run_script, print_msg, print_err
+from argparse import ArgumentParser, Action
+from finpj import InstallSC, InstallFailedException, GetConfigs, run_script, print_header_msg, print_msg, print_err, InstallFlag
+
+
+install_flgs = InstallFlag(
+    0x00,  # source_from_package
+    0x01,  # source_from_git
+    0x00,  # restore_install
+    0x02,  # full_install
+    0x04,  # init_db
+    0x08,  # as_base_db
+    0x10,  # data_loader
+    0x20,  # avl
+    0x40,  # ut
+    0x80,  # independent_es
+    0x100, # qrr
+    0x200, # debug
+)
 
 
 class Install(object):
@@ -23,22 +40,25 @@ class Install(object):
         self.__setup_tmpdir()
 
         # install_method:
-        #   True:  --full-install 数据库恢复而来, 安装时不需要初始化数据库, dataloader
-        #   False: --restore-install
+        #   0: --restore-install
+        #   1: --full-install 数据库恢复而来, 安装时不需要初始化数据库, dataloader
         #
         # 恢复数据库安装
-        if not self.install_config['install_method']:
-            self.install_config['init_db'] = False
-            self.install_config['data_loader'] = False
+        # install_method = 0x02 # (--restore-install, --full-install)
+        if self.install_config['flags'] & install_flgs.full_install == install_flgs.restore_install:
+            # 关闭 init_db
+            self.install_config['flags'] &= ~install_flgs.init_db
+            # 关闭 dataloader
+            self.install_config['flags'] &= ~install_flgs.data_loader
             # db_restore hook 使用
             self.install_config['db_restore_logpath'] = '{}/log_path'.format(self.install_config['tmp_dir'])
             self.install_config['db_restore_logtarget'] = '{}/log_target'.format(self.install_config['tmp_dir'])
             self.install_config['db_restore_artifacts_dir'] = '{}/artifacts'.format(self.install_config['tmp_dir'])
 
         # 如果实例将被用作基础数据库, 将总是执行 init_db 和 dataloader
-        if self.install_config['as_base_db']:
-            self.install_config['init_db'] = True
-            self.install_config['data_loader'] = True
+        if self.install_config['flags'] & install_flgs.as_base_db == install_flgs.as_base_db:
+            # 开启 dataloader
+            self.install_config['flags'] |= install_flgs.data_loader
 
         # 设置 dataloader 目录, git 与 package dataloader 路径不同
         # package: False 0
@@ -47,7 +67,7 @@ class Install(object):
         self.install_config['dataloader_dir'] = (
             'package',
             "{:s}/ibm/dataloaders".format(self.install_config['git_dir'])
-            )[self.install_config['source_from']]
+            )[self.install_config['flags'] & install_flgs.source_from_git]
 
         # 将配置文件写入到文件中, 当做环境变量传递给shell脚本
         env_file = "{:s}/env.sh".format(self.install_config['tmp_dir'])
@@ -82,7 +102,7 @@ class Install(object):
         def wrapper(self):
             # git => True
             # package => False
-            (self._install_from_package, self._install_from_git)[self.install_config['source_from']]()
+            (self._install_from_package, self._install_from_git)[self.install_config['flags'] & install_flgs.source_from_git]()
             func(self)
         return wrapper
 
@@ -100,7 +120,7 @@ class Install(object):
         return response.text
 
     def _install_from_git(self):
-        print_msg("****** Install from GIT... ******")
+        print_header_msg("****** Install from GIT... ******")
         refs = ''
         for sour in self.install_config['source_code']:
             try:
@@ -140,7 +160,7 @@ class Install(object):
                一步一步安装 :install_step_by_step
                恢复安装     :install_from_restore, 必须选择要恢复的数据库
         '''
-        insc = InstallSC(self.install_config['install_method'])
+        insc = InstallSC(self.install_config['flags'] & install_flgs.full_install)
         try:
             insc(**self.install_config)
         except InstallFailedException as e:
@@ -150,9 +170,35 @@ class Install(object):
             raise SystemExit(e)
 
 
-'''
-解析参数
-'''
+class CusAction(Action):
+    _flag_control = 0
+
+    def __init__(self, option_strings, dest='flags', nargs=0, default=False, required=False, help=None, **kwargs):
+        super(CusAction, self).__init__(
+            option_strings=option_strings,
+            dest='flags',
+            nargs=nargs,
+            default=default,
+            required=required,
+            help=help
+        )
+        for key, value in kwargs.iteritems():
+            setattr(self, key, value)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        '''
+        --restore-install: 需要一个参数
+        '''
+        # 只有打开标志位, 没有关闭标志位, 所以全部为 或 操作.
+        CusAction._flag_control |= self.const
+
+        # self.dest 永远等于 flags
+        setattr(namespace, self.dest, CusAction._flag_control)
+        try:
+            # 捕获到 AttributeError 说明没有 self.cus_dest, 则不设置该值, 直接忽略错误
+            setattr(namespace, self.cus_dest, values)
+        except AttributeError:
+            pass
 
 
 def parse_args():
@@ -161,81 +207,80 @@ def parse_args():
         description="SC DevOps tools",
         epilog="Have a Good Day ^.^"
     )
-    subparsers = parser.add_subparsers(prog='Install a new SC instance')
+    installSubparsers = parser.add_subparsers(
+        title='title',
+        description='description',
+        prog='install.py',
+    )
 
     # install a new SC
-    arg_install_sc = subparsers.add_parser('install', help='patch help')
-
-    arg_install_sc.add_argument(
-        '--type',
-        dest="type",
-        type=str,
-        default="install_sc",
-        help='Install a new SC instance'
+    install_sc_args = installSubparsers.add_parser(
+        'install',
+        help='''
+        Install a new SC instance.
+        Type `install.py install -h` to get install help'''
     )
+    # 设置要执行的函数名
+    install_sc_args.set_defaults(func='install_sc')
 
     # --git | --package
-    arg_get_code_method_group = arg_install_sc.add_mutually_exclusive_group(required=True)
-    arg_get_code_method_group.add_argument(
-        '--git',
-        action='store_true',
-        dest='source_from',
-        help='Install from GIT source'
-    )
+    arg_get_code_method_group = install_sc_args.add_mutually_exclusive_group(required=True)
     arg_get_code_method_group.add_argument(
         '--package',
-        action='store_false',
-        dest='source_from',
-        help='Install from Build Package'
-    )
-
-    arg_install_sc.add_argument(
-        '--source-code',
-        action='store',
-        dest='source_code',
+        action=CusAction,
         nargs='+',
-        required=True,
+        cus_dest='source_code',
+        const=install_flgs.source_from_package,  # 0
+        help='Install from SC ZIP packages.'
+    )
+    arg_get_code_method_group.add_argument(
+        '--git',
+        action=CusAction,
+        const=install_flgs.source_from_git,  # 1
+        cus_dest='source_code',
+        nargs='+',
+        help='Install from GIT repository.'
     )
 
-    arg_install_sc.add_argument(
+    install_sc_args.add_argument(
         '--conf-section',
         action='store',
         dest='conf_section',
         required=True,
+        help='Config section in [install_config.cfg]'
     )
 
     # --full-install | --restore-install
-    arg_install_method_group = arg_install_sc.add_mutually_exclusive_group(required=True)
-    arg_install_method_group.add_argument(
-        '--full-install',
-        action='store_true',
-        dest='install_method',
-        help='Install SC step by step')
+    arg_install_method_group = install_sc_args.add_mutually_exclusive_group(required=True)
     arg_install_method_group.add_argument(
         '--restore-install',
-        action='store_false',
-        dest='install_method',
-        help='Restore SC and DataBase')
-    arg_install_sc.add_argument(
-        '--db-source',
-        action='store',
-        dest='db_source',
-        default='saleconn',
+        action=CusAction,
+        cus_dest='db_source',  # 用来存储备份数据库名字
+        nargs=1,  # 此处需要一个参数, 用来指定备份数据库的名字
+        const=install_flgs.restore_install,  # 0
+        help='''During the installation, it will not initialize database and create tables etc.,
+        but restore DB from a DB backup file.'''
+    )
+    arg_install_method_group.add_argument(
+        '--full-install',
+        action=CusAction,
+        const=install_flgs.full_install,  # 1
+        help='Install SC step by step, this means it will initialize a new database and create all tables during the installation.'
     )
 
-    arg_install_sc.add_argument(
+    install_sc_args.add_argument(
         '--instance-name',
         action='store',
         dest='instance_name',
         default='sugarcrm',
     )
-    arg_install_sc.add_argument(
+    install_sc_args.add_argument(
         '--instance-db-name',
         action='store',
         dest='db_name',
         default='saleconn',
     )
-    arg_install_sc.add_argument(
+    install_sc_args.add_argument(
         '--keep-alive',
         action='store',
         dest='keep_alive',
@@ -244,98 +289,73 @@ def parse_args():
         default=3,
     )
 
-    # 是否初始化数据库
-    arg_init_db_group = arg_install_sc.add_mutually_exclusive_group(required=True)
-    arg_init_db_group.add_argument(
+    install_sc_args.add_argument(
         '--init-db',
-        action='store_true',
-        dest='init_db',
+        action=CusAction,
+        const=install_flgs.init_db,
+        help='Run DB initialize script, it will create a new database with the name specified by --db_name parameter'
     )
-    arg_init_db_group.add_argument(
-        '--no-init-db',
-        action='store_false',
-        dest='init_db',
-    )
-
-    # dataloader
-    arg_run_dataloader_group = arg_install_sc.add_mutually_exclusive_group(required=True)
-    arg_run_dataloader_group.add_argument(
-        '--data-loader',
-        action='store_true',
-        dest='data_loader',
-    )
-    arg_run_dataloader_group.add_argument(
-        '--no-data-loader',
-        action='store_false',
-        dest='data_loader',
-    )
-
-    # avl
-    arg_run_avl_group = arg_install_sc.add_mutually_exclusive_group(required=True)
-    arg_run_avl_group.add_argument(
-        '--avl',
-        action='store_true',
-        dest='avl',
-    )
-    arg_run_avl_group.add_argument(
-        '--no-avl',
-        action='store_false',
-        dest='avl',
-    )
-
-    # unittest
-    arg_run_unittest_group = arg_install_sc.add_mutually_exclusive_group(required=True)
-    arg_run_unittest_group.add_argument(
-        '--ut',
-        action='store_true',
-        dest='ut',
-    )
-    arg_run_unittest_group.add_argument(
-        '--no-ut',
-        action='store_false',
-        dest='ut',
-    )
-
-    arg_install_sc.add_argument(
-        '--independent-es',
-        action='store_true',
-        dest='independent_es',
-    )
-    arg_install_sc.add_argument(
+    install_sc_args.add_argument(
         '--as-base-db',
-        action='store_true',
-        dest='as_base_db',
-        help='As a DB base image'
+        action=CusAction,
+        const=install_flgs.as_base_db,
+        help='''If this parameter is provided, backup this database,
+        and the database will be used as base database, and the backup file can be used as by other SC instance which install with --restore paramter'''
     )
-    arg_install_sc.add_argument(
+    install_sc_args.add_argument(
+        '--data-loader',
+        action=CusAction,
+        const=install_flgs.data_loader,
+        help='''Run dataloader after install.
+        Default = False'''
+    )
+    install_sc_args.add_argument(
+        '--avl',
+        action=CusAction,
+        const=install_flgs.avl,
+        help="Import AVL data."
+    )
+    install_sc_args.add_argument(
+        '--ut',
+        action=CusAction,
+        const=install_flgs.ut,
+        help='Run PHP Unittest after install.'
+    )
+    install_sc_args.add_argument(
+        '--independent-es',
+        action=CusAction,
+        const=install_flgs.independent_es,
+        help='Create a new Independent ES instance.'
+    )
+    install_sc_args.add_argument(
         '--qrr',
-        action='store_true',
-        dest='qrr_after_install',
-        help='Run QRR after install'
+        action=CusAction,
+        const=install_flgs.qrr,
     )
-    arg_install_sc.add_argument(
+    install_sc_args.add_argument(
         '--cus-install-hook',
         action='store',
         dest='cus_install_hook',
         help='custom install hook script'
     )
-    arg_install_sc.add_argument(
+    install_sc_args.add_argument(
         '--debug',
-        action='store_true',
-        dest='debug',
+        action=CusAction,
+        const=install_flgs.debug,
     )
 
     args = vars(parser.parse_args())
+
     try:
         {
             'install_sc': Install,
-        }[args['type']](**args)
+        }[args['func']](**args)
     except KeyError as e:
-        print_err(e)
+        raise SystemExit("Error: Key [{:s}] does not exists.".format(e))
     except AttributeError as e:
-        print_err(e)
+        raise SystemError("Error: Attribute [{:s}] does not exists.".format(e))
     except Exception as e:
-        print_err(e)
+        raise SystemError(e)
 
 
 # Namespace(func='install_sc', restore_install=False, source_code=['11223', 'sugareps:ibm_r40', 'prod.zip'])

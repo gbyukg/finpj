@@ -7,7 +7,7 @@ Created on 2017年7月24日
 
 import requests
 from InstallHooks import installHooks
-from Common import print_msg, print_headder_msg
+from Common import print_msg, print_header_msg
 
 __all__ = [
     'InstallFailedException',
@@ -33,7 +33,7 @@ class InstallSC(object):
         try:
             # --full-install: True 1
             # --restore-install : False 0
-            return (self.install_from_restore, self.install_step_by_step)[self.approach](*args, **kvargs)
+            return (self.install_from_restore, '', self.install_step_by_step)[self.approach](*args, **kvargs)
         except KeyError:
             raise InstallFailedException(
                 'Error: Currently, only support [install_step_by_step] and [install_from_restore]'
@@ -41,7 +41,7 @@ class InstallSC(object):
 
     @installHooks('install_sbs')
     def install_step_by_step(self, *args, **kvargs):
-        print_headder_msg("Starting to install Step by Step")
+        print_header_msg("Starting to install Step by Step")
         try:
             kvargs['instance_url'] = '{}/{}'.format(kvargs['web_host'], kvargs['instance_name'])
             kvargs['install_url'] = '{}/install.php'.format(kvargs['instance_url'])

@@ -4,6 +4,20 @@ set -o nounset
 
 SCRIPT_NAME=$(basename "$0")
 
+SOURCE_FROM_PACKAGE=0x00
+SOURCE_FROM_GIT=0x01
+RESTORE_INSTALL=0x00
+FULL_INSTALL=0x02
+INIT_DB=0x04
+AS_BASE_DB=0x08
+DATA_LOADER=0x10
+AVL=0x20
+UT=0x40
+INDEPENDENT_ES=0x80
+QRR=0x100
+DEBUG=0x200
+
+
 __logging()
 {
     local FUN_NAME="${1}"
@@ -34,7 +48,7 @@ __command_logging_and_exit()
     return_code="$?"
 
     if [[ 0 -eq "${return_code}" ]]; then
-        #[[ "$DEBUG" -eq 1 ]] && echo "${msg}"
+        [[ $(($FLAGS & $DEBUG)) -eq $DEBUG ]] && echo "${msg}"
         __logging "$FUN_NAME" "$LINE_NO" "SH-COMMAND:${return_code}" "${cmd}"
     else
         echo "SH-COMMAND[${return_code}] ${cmd}; Message: [${msg}]"
@@ -158,7 +172,7 @@ init_db()
     db2 "CREATE  LARGE  TABLESPACE SUGARTS PAGESIZE 32 K  MANAGED BY AUTOMATIC STORAGE EXTENTSIZE 32 OVERHEAD 10.5 PREFETCHSIZE 32 TRANSFERRATE 0.14 BUFFERPOOL SUGARBP"
     db2 "CREATE USER TEMPORARY TABLESPACE SUGARXGTTTS IN DATABASE PARTITION GROUP IBMDEFAULTGROUP PAGESIZE 32K MANAGED BY AUTOMATIC STORAGE EXTENTSIZE 32 PREFETCHSIZE 32 BUFFERPOOL SUGARBP OVERHEAD 7.5 TRANSFERRATE 0.06 NO FILE SYSTEM CACHING"
 
-    if [[ "${AS_BASE_DB}" == 'True' ]]; then
+    if [[ $(($FLAGS & $AS_BASE_DB)) -eq $AS_BASE_DB ]]; then
         db2 "UPDATE database configuration for $DB_NAME using LOGARCHMETH1 LOGRETAIN"
 
         __stop_db_app
@@ -468,7 +482,7 @@ run_unittest()
     echo 'Starting to run PHP UNITTEST...'
     cd "${WEB_DIR}/${INSTANCE_NAME}"/tests
 
-    vendor_unit= "${WEB_DIR}"/"${INSTANCE_NAME}"/vendor/bin/phpunit
+    vendor_unit="${WEB_DIR}"/"${INSTANCE_NAME}"/vendor/bin/phpunit
     if [[ -f "${vendor_unit}" ]]; then
         php "${vendor_unit}"
     else
@@ -494,25 +508,28 @@ after_install_restore()
 
 before_install_sbs()
 {
-    [[ "${INIT_DB}" == 'True' ]] && init_db
+    echo ''
+    echo '--- before_install_sbs ---'
+    echo ''
+    [[ $(($FLAGS & $INIT_DB)) -eq $INIT_DB ]] && init_db
 }
 
 after_install_sbs()
 {
     # run dataloader
-    [[ "${DATA_LOADER}" == 'True' ]] && run_dataloader
+    [[ $(($FLAGS & $DATA_LOADER)) -eq $DATA_LOADER ]] && run_dataloader
 
     # run AVL
-    [[ "${AVL}" == 'True' ]] && run_avl
+    [[ $(($FLAGS & $AVL)) -eq $AVL ]] && run_avl
 
     # run UnitTest
-    [[ "${UT}" == 'True' ]] && run_unittest
+    [[ $(($FLAGS & $UT)) -eq $UT ]] && run_unittest
 
     # 是否要跑 QRR, 应该在数据库备份之前
-    [[ "${QRR_AFTER_INSTALL}" == 'True' ]] && run_qrr
+    [[ $(($FLAGS & $QRR)) -eq $QRR ]] && run_qrr
 
     # 备份数据库
-    [[ "${AS_BASE_DB}" == 'True' ]] && backup_db
+    [[ $(($FLAGS & $AS_BASE_DB)) -eq $AS_BASE_DB ]] && backup_db
 }
 
 __main()
@@ -520,8 +537,7 @@ __main()
     local HOOK_NAME="${1}"
     shift
 
-    DEBUG=${DEBUG-'False'}
-    [[ "${DEBUG}" == 'True' ]] && set -x
+    [[ $(($FLAGS & $DEBUG)) -eq $DEBUG ]] && set -x
 
     # 修改为了从 setup.py 获取
     [[ -f "${CUS_INSTALL_HOOK}" ]] && . "${CUS_INSTALL_HOOK}"
