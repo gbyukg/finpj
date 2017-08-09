@@ -181,7 +181,7 @@ init_db()
         db2 "backup db $DB_NAME to ${DBSOURCE_DIR}" || \
             __err "$LINENO" "Full DB backup failed."
         # 删除此次备份, 备份只为了能够使用这个数据库
-        rm -rf "${DBSOURCE_DIR}/${DB_NAME}"*
+        rm -rf "${DBSOURCE_DIR}/${DB_NAME}".0.*
     fi
 }
 

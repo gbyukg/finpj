@@ -56,9 +56,9 @@ class Install(object):
             self.install_config['db_restore_artifacts_dir'] = '{}/artifacts'.format(self.install_config['tmp_dir'])
 
         # 如果实例将被用作基础数据库, 将总是执行 init_db 和 dataloader
-        if self.install_config['flags'] & install_flgs.as_base_db == install_flgs.as_base_db:
+        #if self.install_config['flags'] & install_flgs.as_base_db == install_flgs.as_base_db:
             # 开启 dataloader
-            self.install_config['flags'] |= install_flgs.data_loader
+            #self.install_config['flags'] |= install_flgs.data_loader
 
         # 设置 dataloader 目录, git 与 package dataloader 路径不同
         # package: False 0
