@@ -12,7 +12,8 @@ import sys
 __all__ = [
     'print_msg',
     'print_err',
-    'InstallFlag'
+    'InstallFlag',
+    'print_header_msg'
 ]
 
 # 'package git restore_install full_install init_db as_base_db data_loader avl ut independent_es qrr debug'

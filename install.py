@@ -11,7 +11,7 @@ import sys
 import requests
 import datetime
 from argparse import ArgumentParser, Action
-from finpj import InstallSC, InstallFailedException, GetConfigs, run_script, print_header_msg, print_msg, print_err, InstallFlag
+from finpj import *
 
 
 install_flgs = InstallFlag(
@@ -49,7 +49,7 @@ class Install(object):
             # 关闭 init_db
             self.install_config['flags'] &= ~install_flgs.init_db
             # 关闭 dataloader
-            self.install_config['flags'] &= ~install_flgs.data_loader
+            # self.install_config['flags'] &= ~install_flgs.data_loader
             # db_restore hook 使用
             self.install_config['db_restore_logpath'] = '{}/log_path'.format(self.install_config['tmp_dir'])
             self.install_config['db_restore_logtarget'] = '{}/log_target'.format(self.install_config['tmp_dir'])
@@ -65,8 +65,8 @@ class Install(object):
         # git: True 1
         # [self.install_config['source_from']]
         self.install_config['dataloader_dir'] = (
-            'package',
-            "{:s}/ibm/dataloaders".format(self.install_config['git_dir'])
+            '{:s}/ibm/dataloader'.format(self.install_config['tmp_dir']),  # package dataloader
+            "{:s}/ibm/dataloaders".format(self.install_config['git_dir'])  # git dataloader
             )[self.install_config['flags'] & install_flgs.source_from_git]
 
         # 将配置文件写入到文件中, 当做环境变量传递给shell脚本
@@ -152,7 +152,15 @@ class Install(object):
         run_script('build_code')
 
     def _install_from_package(self):
-        pass
+        print_header_msg('install from package')
+        remote = 0
+        locally = 1
+        f = lambda idx, p: '{}^{}'.format(remote, p, idx) if p.startswith('http') else '{}^{}'.format(locally, p, idx)
+        params = [f(idx, package.strip()) for idx, package in enumerate(self.install_config['source_code'])]
+        cus_params = ' '.join(params)
+        run_script('upgrade_package')
+        raise SystemError()
+        run_script('prepare_source_from_package', cus_param=cus_params)
 
     @_prepare_source_code
     def install_sc(self):

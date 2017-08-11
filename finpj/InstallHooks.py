@@ -40,6 +40,7 @@ def installHooks(hook_type):
         def wrapper(*args, **kvargs):
             # before hook
             run_script('before_' + hook_type, *args, **kvargs)
+
             func(*args, **kvargs)
 
             # after hook

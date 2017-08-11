@@ -6,8 +6,8 @@ Created on 2017年7月24日
 '''
 
 import requests
-from InstallHooks import installHooks
-from Common import print_msg, print_header_msg
+from .InstallHooks import *
+from .Common import *
 
 __all__ = [
     'InstallFailedException',
@@ -39,7 +39,7 @@ class InstallSC(object):
                 'Error: Currently, only support [install_step_by_step] and [install_from_restore]'
             )
 
-    @installHooks('install_sbs')
+    @installHooks('install')
     def install_step_by_step(self, *args, **kvargs):
         print_header_msg("Starting to install Step by Step")
         try:
@@ -161,14 +161,14 @@ class InstallSC(object):
 
         reqSessiong = requests.Session()
         reqSessiong.get(kvargs['install_url'])
-        i = 0
+
         for inx, step in enumerate(self.install_steps_data):
             print_msg("Current step [{:d}]".format(inx))
             response = reqSessiong.post(kvargs['install_url'], data=step)
             if not response.ok:
                 response.raise_for_status()
 
-    @installHooks('install_restore')
+    @installHooks('install')
     def install_from_restore(self, *args, **kvargs):
         print_msg("Install from restore")
         pass

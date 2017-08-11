@@ -95,8 +95,6 @@ prepare_source_from_pr()
     __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "git rev-parse --git-dir"
 
     for par in "${PR_NUMS[@]}"; do
-        # pr sugareps 12345
-        # br sugareps ibm_r40
         IFS=:
         info=($par)
         unset IFS
@@ -130,6 +128,112 @@ prepare_source_from_pr()
     after_prepare_code
 }
 
+prepare_source_from_package()
+{
+    echo 'prepare source from package'
+
+    local fun=(remote locally)
+    local pack_list_file="${TMP_DIR}"/package.list
+
+    remote()
+    {
+        local pak="$1"
+        local pak_name=$(basename $pak)
+
+        echo "Downloading package [${pak_name}] ..."
+        __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "wget -q ${pak} -O ${TMP_DIR}/${pak_name}"
+        echo "${pak_name}" >> "${pack_list_file}"
+    }
+
+    locally()
+    {
+        local pak="$1"
+        local pak_name=$(basename $pak)
+
+        echo "Copying package [${pak_name}] ..."
+        [[ ! -f "$pak" ]] && __err "$LINENO" "SC package [${pak}] does not exist."
+        __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "cp $pak ${TMP_DIR}/${pak_name}"
+        echo "${pak_name}" >> "${pack_list_file}"
+    }
+
+    # 安装时将根据 package.list 列表里的顺序进行打包
+    # 第一个包将作为基础包
+    cat /dev/null > "${pack_list_file}"
+    for package in "$@"; do
+        IFS=^
+        info=($package)
+        unset IFS
+        ${fun[info[0]]} "${info[1]}"
+    done
+
+    # 解压文件里的第一个压缩包, 基础包
+    base_package=$(head -1  "${pack_list_file}")
+    [[ -d "${WEB_DIR}/SugarUlt-Full-7.6.0" ]] && rm -rf "${WEB_DIR}/SugarUlt-Full-7.6.0"
+    [[ -d "${WEB_DIR}/${INSTANCE_NAME}" ]] && rm -rf "${WEB_DIR}/${INSTANCE_NAME}"
+
+    __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "unzip -o ${TMP_DIR}/${base_package} \"SugarUlt-Full-7.6.0/*\" -d ${WEB_DIR}/ > /dev/null"
+    __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "mv ${WEB_DIR}/SugarUlt-Full-7.6.0 ${WEB_DIR}/${INSTANCE_NAME}"
+
+    # 包安装时不需要跑 federation 脚本
+    # 在最后一个包安装完成后, 跑最后一个包中的脚本
+    mv "${WEB_DIR}/${INSTANCE_NAME}"/custom/install/federated_db_environment/sql "${TMP_DIR}"/sql-back
+
+    # 解压基础包中的 SugarInstanceManger
+    __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "unzip -o ${TMP_DIR}/${base_package} \"ibm/SugarInstanceManager/*\" -d ${TMP_DIR}/ > /dev/null"
+}
+
+upgrade_package()
+{
+    local pack_list_file="${TMP_DIR}"/package.list
+
+    [[ ! -f "${pack_list_file}" ]] \
+        && echo "No upgrade package found." \
+        && exit 0
+
+    # 更新基础包中的 SugarInstanceManager 配置
+    cd "${TMP_DIR}/ibm/SugarInstanceManager" || __err "$LINENO" "SugarInstanceManager folder does not exist."
+    mkdir -p "custom/include/Config/configs"
+
+    # 禁止备份数据库
+    sed -i "s/\s*\$su->backup();//g" upgrade.php
+    # 禁止重新启动 apache
+    sed -i "s/\$success = SystemUtils::apache('restart');/\$success = true;/" include/SugarUpgrader.php
+
+    cat <<SYSCONFIG > custom/include/Config/configs/system.config.php
+<?php
+\$config['apache_binary'] = '${APACHE_BINARY}';
+\$config['apache_user'] = '${APACHE_USER}';
+\$config['apache_group'] = '${APACHE_GROUP}';
+\$config['temp_dir'] = "${TMP_DIR}/SIM";
+SYSCONFIG
+    cat <<db2CONFIG > custom/include/Config/configs/db2cli.config.php
+<?php
+\$config['db2profile'] = '${DB2PROFILE}';
+\$config['db2createscript'] = '${SCRIPT_NAME}/initdb.sh';
+\$config['db2runas'] = '${DB2RUNAS}';
+db2CONFIG
+    cat <<logCONFIG > custom/include/Config/configs/logger.config.php
+<?php
+\$config['log_file'] = '${TMP_DIR}/SugarInstanceManager.log';
+\$config['log_dir'] = '${TMP_DIR}/upgrade_log';
+logCONFIG
+
+    # 开始升级
+    {
+        # 忽略第一行, 第一行记录的是基础包, 从第二行开始才是升级包
+        read
+        while read -r ug_pak || [[ -n "$ug_pak"  ]]; do
+            echo "Upgrading SC package [$ug_pak] ..."
+            php upgrade.php --instance_path="${WEB_DIR}/${INSTANCE_NAME}" --upgrade_zip="${TMP_DIR}/${ug_pak}"
+        done
+    } < "${pack_list_file}"
+
+    # prepare dataloader
+    local last_package=$(tail -1 ${pack_list_file})
+    echo "Extract dataloader file from package [${last_package}]"
+    __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "unzip -o ${TMP_DIR}/${last_package} \"ibm/dataloaders/*\" -d ${TMP_DIR}/ > /dev/null"
+}
+
 __stop_db_app()
 {
     circularCount="${1:-0}"
@@ -150,6 +254,7 @@ init_db()
 {
     echo "Creating database ${DB_NAME}..."
 
+    # 移除数据库, 如果已经存在
     [[ $(db2 list db directory | grep "${DB_NAME} > /dev/null 2&>1"; echo $?) -ne 0 ]] &&\
         __stop_db_app && \
         db2 drop database "${DB_NAME}"
@@ -493,29 +598,29 @@ run_unittest()
     exit 0
 }
 
-before_install_restore()
+before_install()
 {
-    echo 'before_install_restore'
-    db_restore
-    update_conf
-    run_qrr
-}
+    echo 'Run Hook [before install]'
 
-after_install_restore()
-{
-    echo 'after_install_restore'
-}
-
-before_install_sbs()
-{
-    echo ''
-    echo '--- before_install_sbs ---'
-    echo ''
     [[ $(($FLAGS & $INIT_DB)) -eq $INIT_DB ]] && init_db
+
+    # restore database
+    # RESTORE_INSTALL 为0, 需要使用 FULL_INSTALL 做比较
+    if [[ $(($FLAGS & $FULL_INSTALL)) -ne $FULL_INSTALL ]]; then
+        db_restore
+        update_conf
+        run_qrr
+    fi
+
+    # 此处需要有一条语句, 防止上面的判断导致函数退出返回非0值
+    echo 'Finished'
 }
 
-after_install_sbs()
+after_install()
 {
+    # 升级补丁包
+    [[ $(($FLAGS & $SOURCE_FROM_PACKAGE)) -eq $SOURCE_FROM_PACKAGE ]] && upgrade_package
+
     # run dataloader
     [[ $(($FLAGS & $DATA_LOADER)) -eq $DATA_LOADER ]] && run_dataloader
 
