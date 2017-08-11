@@ -79,6 +79,7 @@ class Install(object):
         # 设置 BASH_ENV 环境变量, 执行脚本时自动读取该文件获取环境变量
         os.environ["BASH_ENV"] = env_file
 
+        run_script('info')
         self.install_sc()
 
     def __setup_tmpdir(self):
@@ -158,8 +159,6 @@ class Install(object):
         f = lambda idx, p: '{}^{}'.format(remote, p, idx) if p.startswith('http') else '{}^{}'.format(locally, p, idx)
         params = [f(idx, package.strip()) for idx, package in enumerate(self.install_config['source_code'])]
         cus_params = ' '.join(params)
-        run_script('upgrade_package')
-        raise SystemError()
         run_script('prepare_source_from_package', cus_param=cus_params)
 
     @_prepare_source_code

@@ -17,6 +17,20 @@ INDEPENDENT_ES=0x80
 QRR=0x100
 DEBUG=0x200
 
+_print_msg()
+{
+    printf "\n\e[35m%s [ %s ] %s\e[0m\n" ">>>>>> " "$1" " <<<<<<"
+}
+
+_red_echo()
+{
+    printf "\n\e[31m%s\e[0m\n" "$@"
+}
+
+_green_echo()
+{
+    printf "\n\e[32m%s\e[0m\n" "$@"
+}
 
 __logging()
 {
@@ -57,11 +71,21 @@ __command_logging_and_exit()
     fi
 }
 
+info()
+{
+    . whosay.sh
+    echo -e "\n\n\n"
+    cowsay -f $whosay "Ready, GO!!!"
+    echo -e "\n"
+    _green_echo "${WEB_HOST}/${INSTANCE_NAME}"
+    echo -e "\n\n\n"
+}
+
 build_code()
 {
     __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Run hook [build_code]"
 
-    echo "building code..."
+    _print_msg "building code..."
     __command_logging_and_exit \
         "${FUNCNAME[0]}" "$LINENO" \
         "cd ${GIT_DIR}/build/rome && php build.php -clean -cleanCache -flav=ult -ver='7.1.5' -dir=sugarcrm -build_dir=${BUILD_DIR}"
@@ -73,15 +97,14 @@ build_code()
 after_prepare_code()
 {
     # update composer
-    echo "update composer..."
+    _print_msg "update composer..."
     cd "${GIT_DIR}"/sugarcrm || exit 1
     COMPOSER_DISABLE_XDEBUG_WARN=1 composer update
 }
 
 prepare_source_from_pr()
 {
-    echo "Preparing git..."
-    echo ''
+    _print_msg "Preparing git..."
 
     local PR_NUMS=($@)
     local git_refs="git@github.com:sugareps/Mango.git +refs/heads/*:refs/remotes/sugareps/*"
@@ -118,10 +141,14 @@ prepare_source_from_pr()
     __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "git reset --hard"
     __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "git clean -fd"
 
+    __logging "${FUNCNAME[0]}" "$LINENO" "[info]" "fetch ref: ${git_refs}"
     __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "git fetch ${git_refs}" #|| __err "$LINENO" "git fetch failed."
+
+    __logging "${FUNCNAME[0]}" "$LINENO" "[info]" "fetch check ref: ${check_ref}"
     __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "git checkout -f ${check_ref}"
     [[ -n "${merge_ref}" ]] && __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "git merge --squash ${merge_ref}"
 
+    __logging "${FUNCNAME[0]}" "$LINENO" "[info]" "update submodule"
     __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "git submodule sync"
     __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "git submodule update --init --recursive"
 
@@ -130,7 +157,7 @@ prepare_source_from_pr()
 
 prepare_source_from_package()
 {
-    echo 'prepare source from package'
+    _print_msg 'Prepare source from package ...'
 
     local fun=(remote locally)
     local pack_list_file="${TMP_DIR}"/package.list
@@ -140,8 +167,9 @@ prepare_source_from_package()
         local pak="$1"
         local pak_name=$(basename $pak)
 
-        echo "Downloading package [${pak_name}] ..."
+        _green_echo "Downloading package [${pak_name}] ..."
         __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "wget -q ${pak} -O ${TMP_DIR}/${pak_name}"
+        __logging "${FUNCNAME[0]}" "$LINENO" "[info]" "Downloaded remote package [${pak_name}] from [${pak}]"
         echo "${pak_name}" >> "${pack_list_file}"
     }
 
@@ -150,9 +178,10 @@ prepare_source_from_package()
         local pak="$1"
         local pak_name=$(basename $pak)
 
-        echo "Copying package [${pak_name}] ..."
+        _green_echo "Copying package [${pak_name}] ..."
         [[ ! -f "$pak" ]] && __err "$LINENO" "SC package [${pak}] does not exist."
         __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "cp $pak ${TMP_DIR}/${pak_name}"
+        __logging "${FUNCNAME[0]}" "$LINENO" "[info]" "Copied locally package [${pak_name}] from [${pak}]"
         echo "${pak_name}" >> "${pack_list_file}"
     }
 
@@ -168,8 +197,12 @@ prepare_source_from_package()
 
     # 解压文件里的第一个压缩包, 基础包
     base_package=$(head -1  "${pack_list_file}")
-    [[ -d "${WEB_DIR}/SugarUlt-Full-7.6.0" ]] && rm -rf "${WEB_DIR}/SugarUlt-Full-7.6.0"
-    [[ -d "${WEB_DIR}/${INSTANCE_NAME}" ]] && rm -rf "${WEB_DIR}/${INSTANCE_NAME}"
+    [[ -d "${WEB_DIR}/SugarUlt-Full-7.6.0" ]] \
+        && rm -rf "${WEB_DIR}/SugarUlt-Full-7.6.0" \
+        && __logging "${FUNCNAME[0]}" "$LINENO" "[info]" "Clean web dir [SugarUlt-Full-7.6.0]"
+    [[ -d "${WEB_DIR}/${INSTANCE_NAME}" ]] \
+        && rm -rf "${WEB_DIR}/${INSTANCE_NAME}" \
+        && __logging "${FUNCNAME[0]}" "$LINENO" "[info]" "Clean web dir [${INSTANCE_NAME}]"
 
     __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "unzip -o ${TMP_DIR}/${base_package} \"SugarUlt-Full-7.6.0/*\" -d ${WEB_DIR}/ > /dev/null"
     __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "mv ${WEB_DIR}/SugarUlt-Full-7.6.0 ${WEB_DIR}/${INSTANCE_NAME}"
@@ -184,10 +217,12 @@ prepare_source_from_package()
 
 upgrade_package()
 {
+    _print_msg "Starting to upgrade SC package ..."
+
     local pack_list_file="${TMP_DIR}"/package.list
 
     [[ ! -f "${pack_list_file}" ]] \
-        && echo "No upgrade package found." \
+        && _green_echo "No upgrade package found." \
         && exit 0
 
     # 更新基础包中的 SugarInstanceManager 配置
@@ -223,7 +258,8 @@ logCONFIG
         # 忽略第一行, 第一行记录的是基础包, 从第二行开始才是升级包
         read
         while read -r ug_pak || [[ -n "$ug_pak"  ]]; do
-            echo "Upgrading SC package [$ug_pak] ..."
+            _green_echo "Upgrading SC package [$ug_pak] ..."
+            __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Upgrade package: php upgrade.php --instance_path=${WEB_DIR}/${INSTANCE_NAME} --upgrade_zip=${TMP_DIR}/${ug_pak}"
             php upgrade.php --instance_path="${WEB_DIR}/${INSTANCE_NAME}" --upgrade_zip="${TMP_DIR}/${ug_pak}"
         done
     } < "${pack_list_file}"
@@ -236,7 +272,8 @@ logCONFIG
 
 __stop_db_app()
 {
-    circularCount="${1:-0}"
+    local circularCount="${1:-1}"
+    _green_echo "Cleaning DB connections, time [${circularCount}]"
     # 检查是否还有连接连到该数据库上
     db2 list applications for database "${DB_NAME}" show detail
     if [[ $? -eq 0 ]]; then
@@ -244,19 +281,22 @@ __stop_db_app()
         db2 QUIESCE DATABASE IMMEDIATE FORCE CONNECTIONS
         db2 CONNECT RESET
         sleep 2
-        circularCount=$((circularCount + 1))
-        [[ "$circularCount" -eq 6 ]] && return
+        # circularCount=$((circularCount + 1))
+        # [[ "$circularCount" -eq 6 ]] && return
         __stop_db_app circularCount
     fi
+
+    _green_echo "Cleaned DB connections"
 }
 
 init_db()
 {
-    echo "Creating database ${DB_NAME}..."
+    _print_msg "Creating database ${DB_NAME}..."
 
     # 移除数据库, 如果已经存在
     [[ $(db2 list db directory | grep "${DB_NAME} > /dev/null 2&>1"; echo $?) -ne 0 ]] &&\
         __stop_db_app && \
+        __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Removing DB [${DB_NAME}]" && \
         db2 drop database "${DB_NAME}"
 
     db2 "CREATE DATABASE ${DB_NAME} USING CODESET UTF-8 TERRITORY US COLLATE USING UCA500R1_LEN_S2 PAGESIZE 32 K" # create the database from scratch and enable case-insensitive collation
@@ -278,12 +318,14 @@ init_db()
     db2 "CREATE USER TEMPORARY TABLESPACE SUGARXGTTTS IN DATABASE PARTITION GROUP IBMDEFAULTGROUP PAGESIZE 32K MANAGED BY AUTOMATIC STORAGE EXTENTSIZE 32 PREFETCHSIZE 32 BUFFERPOOL SUGARBP OVERHEAD 7.5 TRANSFERRATE 0.06 NO FILE SYSTEM CACHING"
 
     if [[ $(($FLAGS & $AS_BASE_DB)) -eq $AS_BASE_DB ]]; then
+        __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Update DB config using LOGARCHMETH1 LOGRETAIN"
         db2 "UPDATE database configuration for $DB_NAME using LOGARCHMETH1 LOGRETAIN"
 
         __stop_db_app
 
         # 需要一次全量备份, 才能使用数据库
-        db2 "backup db $DB_NAME to ${DBSOURCE_DIR}" || \
+        __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "backup db for the first time to use DB."
+        db2 "backup db $DB_NAME to ${DBSOURCE_DIR} with 8 buffers buffer 8192 compress" || \
             __err "$LINENO" "Full DB backup failed."
         # 删除此次备份, 备份只为了能够使用这个数据库
         rm -rf "${DBSOURCE_DIR}/${DB_NAME}".0.*
@@ -292,12 +334,13 @@ init_db()
 
 backup_db()
 {
-    echo "Backuping DB ${DB_NAME} ..."
+    _print_msg "Backuping DB ${DB_NAME} ..."
     db2 "backup db ${DB_NAME} online to ${DBSOURCE_DIR} with 8 buffers buffer 8192 compress include logs without prompting"
     db2ckbkp -h "${DBSOURCE_DIR}"/"${DB_NAME}".*
 }
 
 db_restore() {
+    _print_msg "Restoring DB"
     BACKUP_DB_TIMESTAMP=20170804042104
     BACKUP_FILENAME=SALECONN.0.btit.DBPART000.20170804042104.001
 
@@ -489,7 +532,7 @@ fi
 
 run_qrr()
 {
-    echo 'Starting to run QRR...'
+    _print_msg 'Starting to run QRR...'
 
     local qrr_scripts[0]='cacheCleanup'
     local qrr_scripts[1]='runFileMapBuildCache.php'
@@ -505,13 +548,13 @@ run_qrr()
     for script in "${qrr_scripts[@]}"; do
         [[ -f "${script}" ]] && rm -rf "${script}"
         cp vendor/sugareps/SugarInstanceManager/templates/scripts/php/$script ./
-        php -f "$script" 2>&1 | tee qrr_${script}_$$.out
+        php -f "$script" 2>&1 | tee ${LOG_FILE}
     done
 }
 
 update_conf()
 {
-    echo 'Update configfiles...'
+    __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Update sugar instance config.php"
 
     # config.php DB 配置
     __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "sed 's/\^DB_HOST\^/${DB_HOST}/g; s/\^DB_NAME\^/${DB_NAME}/g; s/\^DB_ADMIN_USR\^/${DB_ADMIN_USR}/g; s/\^DB_ADMIN_PWD\^/${DB_ADMIN_PWD}/g' ${PROJECT_DIR}/configs/config.php > ${WEB_DIR}/${INSTANCE_NAME}/config.php"
@@ -522,7 +565,7 @@ update_conf()
 
 run_dataloader()
 {
-    echo "Run dataloader..."
+    _print_msg "Run dataloader..."
 
     __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Run hook [run_dataloader]"
 
@@ -567,15 +610,15 @@ CONFIG
 
 run_avl()
 {
-    echo 'Importing AVL...'
+    _print_msg 'Importing AVL...'
 
     cd "${WEB_DIR}/${INSTANCE_NAME}/custom/cli" || __err "$LINENO" "SC instance directory [${WEB_DIR}/${INSTANCE_NAME}] not exists."
 
-    green_echo "Importing avl.csv..."
+    _green_echo "Importing avl.csv..."
     php cli.php task=Avlimport file="${WEB_DIR}/${INSTANCE_NAME}"/custom/install/avl.csv idlMode=true
 
     for avl_file in ${WEB_DIR}/${INSTANCE_NAME}/custom/install/avl/*.csv; do
-        green_echo "Importing ${avl_file}..."
+        _green_echo "Importing ${avl_file}..."
         php cli.php task=Avlimport file="${avl_file}"
     done
 
@@ -584,7 +627,7 @@ run_avl()
 
 run_unittest()
 {
-    echo 'Starting to run PHP UNITTEST...'
+    _print_msg 'Starting to run PHP UNITTEST...'
     cd "${WEB_DIR}/${INSTANCE_NAME}"/tests
 
     vendor_unit="${WEB_DIR}"/"${INSTANCE_NAME}"/vendor/bin/phpunit
@@ -600,41 +643,60 @@ run_unittest()
 
 before_install()
 {
-    echo 'Run Hook [before install]'
+    _print_msg 'Run Hook [before install]'
 
     [[ $(($FLAGS & $INIT_DB)) -eq $INIT_DB ]] && init_db
 
     # restore database
     # RESTORE_INSTALL 为0, 需要使用 FULL_INSTALL 做比较
     if [[ $(($FLAGS & $FULL_INSTALL)) -ne $FULL_INSTALL ]]; then
+        __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "The instance is installed from restore"
+
+        __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Running [db_restore]"
         db_restore
+
+        __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Running [update_conf]"
         update_conf
+
+        __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Running [run_qrr]"
         run_qrr
     fi
 
     # 此处需要有一条语句, 防止上面的判断导致函数退出返回非0值
-    echo 'Finished'
+    echo ''
 }
 
 after_install()
 {
     # 升级补丁包
-    [[ $(($FLAGS & $SOURCE_FROM_PACKAGE)) -eq $SOURCE_FROM_PACKAGE ]] && upgrade_package
+    [[ $(($FLAGS & $SOURCE_FROM_PACKAGE)) -eq $SOURCE_FROM_PACKAGE ]] \
+        && __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Upgrade package" \
+        && upgrade_package
 
     # run dataloader
-    [[ $(($FLAGS & $DATA_LOADER)) -eq $DATA_LOADER ]] && run_dataloader
+    [[ $(($FLAGS & $DATA_LOADER)) -eq $DATA_LOADER ]] \
+        && __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Import DataLoader" \
+        && run_dataloader
 
     # run AVL
-    [[ $(($FLAGS & $AVL)) -eq $AVL ]] && run_avl
+    [[ $(($FLAGS & $AVL)) -eq $AVL ]] \
+        && __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Import AVL" \
+        && run_avl
 
     # run UnitTest
-    [[ $(($FLAGS & $UT)) -eq $UT ]] && run_unittest
+    [[ $(($FLAGS & $UT)) -eq $UT ]] \
+        && __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Run UnitTest" \
+        && run_unittest
 
     # 是否要跑 QRR, 应该在数据库备份之前
-    [[ $(($FLAGS & $QRR)) -eq $QRR ]] && run_qrr
+    [[ $(($FLAGS & $QRR)) -eq $QRR ]] \
+        && __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Run QRR" \
+        && run_qrr
 
     # 备份数据库
-    [[ $(($FLAGS & $AS_BASE_DB)) -eq $AS_BASE_DB ]] && backup_db
+    [[ $(($FLAGS & $AS_BASE_DB)) -eq $AS_BASE_DB ]] \
+        && __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Backup database" \
+        && backup_db
 }
 
 __main()
