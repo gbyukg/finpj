@@ -690,6 +690,8 @@ install_bp()
 {
     _print_msg "Starting to install BP instance..."
 
+    local ibmscript_path=''
+    local bpscripts_path=''
     IBMSCRIPTS[0]="${ibmscript_path}/task67698_ShowHideModulesForBPClusterDataMigration.php"
     IBMSCRIPTS[1]="${ibmscript_path}/update_system_tabs.php"
 
