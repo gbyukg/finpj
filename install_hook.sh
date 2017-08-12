@@ -314,7 +314,7 @@ init_db()
     _print_msg "Creating database ${DB_NAME}..."
 
     # 移除数据库, 如果已经存在
-    [[ $(db2 list db directory | grep -i "${DB_NAME}" > /dev/null 2&>1; echo $?) -eq 0 ]] \
+    [[ $(db2 list db directory | grep -i "${DB_NAME}" > /dev/null 2>&1; echo $?) -eq 0 ]] \
         && __stop_db_app \
         && __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Removing DB [${DB_NAME}]" \
         && __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "db2 drop database ${DB_NAME}"
