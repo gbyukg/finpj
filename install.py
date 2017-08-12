@@ -65,7 +65,7 @@ class Install(object):
         # git: True 1
         # [self.install_config['source_from']]
         self.install_config['dataloader_dir'] = (
-            '{:s}/ibm/dataloader'.format(self.install_config['tmp_dir']),  # package dataloader
+            '{:s}/ibm/dataloaders'.format(self.install_config['tmp_dir']),  # package dataloader
             "{:s}/ibm/dataloaders".format(self.install_config['git_dir'])  # git dataloader
             )[self.install_config['flags'] & install_flgs.source_from_git]
 

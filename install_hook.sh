@@ -76,7 +76,7 @@ info()
     echo -e "\n\n\n"
 
     [[ -d /usr/share/cowsay ]] && \
-        cowsay -f $(basename $(ls /usr/share/cowsay/*.cow | sort -R | head -1)) "hahaha"
+        cowsay -f $(basename $(ls /usr/share/cowsay/*.cow | sort -R | head -1)) "Ready, GO!"
 
     echo -e "\n"
     _green_echo "${WEB_HOST}/${INSTANCE_NAME}"
