@@ -313,10 +313,10 @@ init_db()
     _print_msg "Creating database ${DB_NAME}..."
 
     # 移除数据库, 如果已经存在
-    [[ $(db2 list db directory | grep -i "${DB_NAME} > /dev/null 2&>1"; echo $?) -ne 0 ]] &&\
-        __stop_db_app && \
-        __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Removing DB [${DB_NAME}]" && \
-        __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "db2 drop database ${DB_NAME}"
+    [[ $(db2 list db directory | grep -i "${DB_NAME} > /dev/null 2&>1"; echo $?) -eq 0 ]] \
+        && __stop_db_app \
+        && __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Removing DB [${DB_NAME}]" \
+        && __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "db2 drop database ${DB_NAME}"
 
     db2 "CREATE DATABASE ${DB_NAME} USING CODESET UTF-8 TERRITORY US COLLATE USING UCA500R1_LEN_S2 PAGESIZE 32 K" # create the database from scratch and enable case-insensitive collation
     db2 "CONNECT TO ${DB_NAME}" # make a connection to update the parameters below
