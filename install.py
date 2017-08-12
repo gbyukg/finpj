@@ -27,6 +27,7 @@ install_flgs = InstallFlag(
     0x80,  # independent_es
     0x100, # qrr
     0x200, # debug
+    0x400, # bp_instance
 )
 
 
@@ -349,6 +350,11 @@ def parse_args():
         '--debug',
         action=CusAction,
         const=install_flgs.debug,
+    )
+    install_sc_args.add_argument(
+        '--bp-instance',
+        action=CusAction,
+        const=install_flgs.bp_instance,
     )
 
     args = vars(parser.parse_args())

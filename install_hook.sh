@@ -16,6 +16,7 @@ UT=0x40
 INDEPENDENT_ES=0x80
 QRR=0x100
 DEBUG=0x200
+BP_INSTANCE=0x400
 
 _print_msg()
 {
@@ -685,12 +686,37 @@ before_install()
     echo ''
 }
 
+install_bp()
+{
+    _print_msg "Starting to install BP instance..."
+
+    IBMSCRIPTS[0]="${ibmscript_path}/task67698_ShowHideModulesForBPClusterDataMigration.php"
+    IBMSCRIPTS[1]="${ibmscript_path}/update_system_tabs.php"
+
+    #SC4BP scripts to run
+    BPSCRIPTS[1]="${bpscripts_path}/67331_SC4BP.php"
+    BPSCRIPTS[2]="${bpscripts_path}/update_show_modules.php"
+    BPSCRIPTS[3]="${bpscripts_path}/update_system_tabs.php"
+    BPSCRIPTS[4]="${bpscripts_path}/delete_config_override_mobileAuthClass.php"
+    BPSCRIPTS[5]="${bpscripts_path}/75915_SC4BP.php"
+    BPSCRIPTS[6]="${bpscripts_path}/73877_SC4BP.php"
+    BPSCRIPTS[7]="${bpscripts_path}/hide_subpanels.php"
+    BPSCRIPTS[8]="${TMP_PATH}/bp_install_scripts/dummycontact.php"
+
+    echo ${BPSCRIPTS[@]}
+}
+
 after_install()
 {
     # 升级补丁包
     [[ $(($FLAGS & $SOURCE_FROM_PACKAGE)) -eq $SOURCE_FROM_PACKAGE ]] \
         && __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Upgrade package" \
         && upgrade_package
+
+    # BP instance
+    [[ $(($FLAGS & $BP_INSTANCE)) -eq $BP_INSTANCE ]] \
+        && __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Install BP instance" \
+        && install_bp
 
     # run dataloader
     [[ $(($FLAGS & $DATA_LOADER)) -eq $DATA_LOADER ]] \
