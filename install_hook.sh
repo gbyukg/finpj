@@ -71,6 +71,33 @@ __command_logging_and_exit()
     fi
 }
 
+__stop_db_app()
+{
+    local circularCount="${1:-1}"
+    _green_echo "Cleaning DB connections, time [${circularCount}]"
+
+    for app in $(db2 list applications for database ${DB_NAME} | awk '/[0-9]/{print $3}')
+    do
+        __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Stoping DB2 application [${app}]"
+        db2 "force application ( $app )"
+    done
+
+
+    # 检查是否还有连接连到该数据库上
+    db2 list applications for database "${DB_NAME}" show detail
+    if [[ $? -eq 0 ]]; then
+        db2 connect to "${DB_NAME}" && \
+        db2 QUIESCE DATABASE IMMEDIATE FORCE CONNECTIONS
+        db2 CONNECT RESET
+        sleep 5
+        # circularCount=$((circularCount + 1))
+        # [[ "$circularCount" -eq 6 ]] && return
+        __stop_db_app circularCount
+    fi
+
+    _green_echo "Cleaned DB connections"
+}
+
 info()
 {
     echo -e "\n\n\n"
@@ -266,37 +293,19 @@ logCONFIG
         done
     } < "${pack_list_file}"
 
-    # prepare dataloader
     local last_package=$(tail -1 ${pack_list_file})
-    echo "Extract dataloader file from package [${last_package}]"
+    # 运行最后一个升级包中的 federation 脚本
+    _green_echo "Extract federation scripts from package [${last_package}]"
+    __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "unzip -o ${TMP_DIR}/${last_package} \"SugarUlt-Full-7.6.0/custom/install/federated_db_environment/*\" -d ${TMP_DIR}/ > /dev/null"
+    __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "cp -rf ${TMP_DIR}/SugarUlt-Full-7.6.0/custom/install/federated_db_environment/ ${WEB_DIR}/${INSTANCE_NAME}/custom/install"
+    __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "cp -rf  ${WEB_DIR}/${INSTANCE_NAME}/custom/install/federated_db_environment/runScenario.php ${WEB_DIR}/${INSTANCE_NAME}"
+    _green_echo "Starting to run federation scripts [Emulation]"
+    __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Run federation script: php ${WEB_DIR}/${INSTANCE_NAME}/runScenario.php Emulation"
+    php "${WEB_DIR}/${INSTANCE_NAME}/runScenario.php" Emulation
+
+    # prepare dataloader
+    _green_echo "Extract dataloader file from package [${last_package}]"
     __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "unzip -o ${TMP_DIR}/${last_package} \"ibm/dataloaders/*\" -d ${TMP_DIR}/ > /dev/null"
-}
-
-__stop_db_app()
-{
-    local circularCount="${1:-1}"
-    _green_echo "Cleaning DB connections, time [${circularCount}]"
-
-    for app in $(db2 list applications for database R40_NODL | awk '/[0-9]/{print $3}')
-    do
-        __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Stoping DB2 application [${app}]"
-        db2 "force application ( $app )"
-    done
-
-
-    # 检查是否还有连接连到该数据库上
-    db2 list applications for database "${DB_NAME}" show detail
-    if [[ $? -eq 0 ]]; then
-        db2 connect to "${DB_NAME}" && \
-        db2 QUIESCE DATABASE IMMEDIATE FORCE CONNECTIONS
-        db2 CONNECT RESET
-        sleep 5
-        # circularCount=$((circularCount + 1))
-        # [[ "$circularCount" -eq 6 ]] && return
-        __stop_db_app circularCount
-    fi
-
-    _green_echo "Cleaned DB connections"
 }
 
 init_db()
@@ -304,10 +313,10 @@ init_db()
     _print_msg "Creating database ${DB_NAME}..."
 
     # 移除数据库, 如果已经存在
-    [[ $(db2 list db directory | grep "${DB_NAME} > /dev/null 2&>1"; echo $?) -ne 0 ]] &&\
+    [[ $(db2 list db directory | grep -i "${DB_NAME} > /dev/null 2&>1"; echo $?) -ne 0 ]] &&\
         __stop_db_app && \
         __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Removing DB [${DB_NAME}]" && \
-        db2 drop database "${DB_NAME}"
+        __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "db2 drop database ${DB_NAME}"
 
     db2 "CREATE DATABASE ${DB_NAME} USING CODESET UTF-8 TERRITORY US COLLATE USING UCA500R1_LEN_S2 PAGESIZE 32 K" # create the database from scratch and enable case-insensitive collation
     db2 "CONNECT TO ${DB_NAME}" # make a connection to update the parameters below
