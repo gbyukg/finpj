@@ -73,9 +73,11 @@ __command_logging_and_exit()
 
 info()
 {
-    . whosay.sh
     echo -e "\n\n\n"
-    cowsay -f $whosay "Ready, GO!!!"
+
+    [[ -d /usr/share/cowsay ]] && \
+        cowsay -f $(basename $(ls /usr/share/cowsay/*.cow | sort -R | head -1)) "hahaha"
+
     echo -e "\n"
     _green_echo "${WEB_HOST}/${INSTANCE_NAME}"
     echo -e "\n\n\n"
@@ -274,13 +276,21 @@ __stop_db_app()
 {
     local circularCount="${1:-1}"
     _green_echo "Cleaning DB connections, time [${circularCount}]"
+
+    for app in $(db2 list applications for database R40_NODL | awk '/[0-9]/{print $3}')
+    do
+        __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Stoping DB2 application [${app}]"
+        db2 "force application ( $app )"
+    done
+
+
     # 检查是否还有连接连到该数据库上
     db2 list applications for database "${DB_NAME}" show detail
     if [[ $? -eq 0 ]]; then
         db2 connect to "${DB_NAME}" && \
         db2 QUIESCE DATABASE IMMEDIATE FORCE CONNECTIONS
         db2 CONNECT RESET
-        sleep 2
+        sleep 5
         # circularCount=$((circularCount + 1))
         # [[ "$circularCount" -eq 6 ]] && return
         __stop_db_app circularCount
