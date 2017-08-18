@@ -697,30 +697,54 @@ before_install()
 
 install_bp()
 {
+    set -x
     _print_msg "Starting to install BP instance..."
 
-    local ibmscript_path=''
-    local bpscripts_path=''
-    IBMSCRIPTS[0]="${ibmscript_path}/task67698_ShowHideModulesForBPClusterDataMigration.php"
-    IBMSCRIPTS[1]="${ibmscript_path}/update_system_tabs.php"
+    local bp_instance_name="bp${INSTANCE_NAME}"
+    local sc4bp_script_path=''
 
-    #SC4BP scripts to run
-    BPSCRIPTS[1]="${bpscripts_path}/67331_SC4BP.php"
-    BPSCRIPTS[2]="${bpscripts_path}/update_show_modules.php"
-    BPSCRIPTS[3]="${bpscripts_path}/update_system_tabs.php"
-    BPSCRIPTS[4]="${bpscripts_path}/delete_config_override_mobileAuthClass.php"
-    BPSCRIPTS[5]="${bpscripts_path}/75915_SC4BP.php"
-    BPSCRIPTS[6]="${bpscripts_path}/73877_SC4BP.php"
-    BPSCRIPTS[7]="${bpscripts_path}/hide_subpanels.php"
-    BPSCRIPTS[8]="${TMP_PATH}/bp_install_scripts/dummycontact.php"
+    if [[ $(($FLAGS & $SOURCE_FROM_GIT)) -eq $SOURCE_FROM_PACKAGE ]]; then
+        __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "unzip -o ${TMP_DIR}/${base_package} \"scripts/sc4bp/*\" -d ${TMP_DIR}/ > /dev/null"
+        sc4bp_script_path="${TMP_DIR}/scripts/sc4bp"
+    else
+        sc4bp_script_path="${GIT_DIR}/ibm/upgrade/default/scripts/sc4bp"
+    fi
 
-    echo ${BPSCRIPTS[@]}
+    __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "sc4bp_script_path: ${sc4bp_script_path}"
+
+    [[ -d "${WEB_DIR}/${bp_instance_name}" ]] && rm -Rf "${WEB_DIR}/${bp_instance_name}"
+    cp -rp "${WEB_DIR}/${INSTANCE_NAME}" "${WEB_DIR}/${bp_instance_name}"
+
+    # 修正 .htaccess 文件
+    __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "sed 's^/${INSTANCE_NAME}^/${bp_instance_name}^g' ${WEB_DIR}/${INSTANCE_NAME}/.htaccess > ${WEB_DIR}/${bp_instance_name}/.htaccess"
+
+    # 删除 cache 缓存文件
+    if [ -d "${WEB_DIR}/${bp_instance_name}/cache" ]; then
+        rm -Rf "${WEB_DIR}/${bp_instance_name}/cache"
+        ln -s "${WEB_DIR}/${INSTANCE_NAME}/cache" "${WEB_DIR}/${bp_instance_name}/cache"
+    fi
+
+    cat <<ORDER > ${sc4bp_script_path}/sc4bp_order.php
+<?php
+include "metadata.php";
+foreach(\$orderedFiles as \$scripts) {
+    echo \$scripts . "\n";
+}
+ORDER
+
+    for script in $(php SOURCE_FROM_PACKAGE/sc4bp_order.php); do
+        _green_echo "Run sc4bp script [${script}]"
+        cp -r "${sc4bp_script_path}/${script}" "${bp_instance_name}"
+        __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "run sc4bp script: ${bp_instance_name}/${script}"
+        php "${bp_instance_name}/${script}"
+    done
+    return 0
 }
 
 after_install()
 {
-    # 升级补丁包
-    [[ $(($FLAGS & $SOURCE_FROM_PACKAGE)) -eq $SOURCE_FROM_PACKAGE ]] \
+    # 升级补丁包 如果与 git 比较结果为0, 则是包安装
+    [[ $(($FLAGS & $SOURCE_FROM_GIT)) -eq $SOURCE_FROM_PACKAGE ]] \
         && __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Upgrade package" \
         && upgrade_package
 
