@@ -55,6 +55,7 @@ class Install(object):
             self.install_config['db_restore_logpath'] = '{}/log_path'.format(self.install_config['tmp_dir'])
             self.install_config['db_restore_logtarget'] = '{}/log_target'.format(self.install_config['tmp_dir'])
             self.install_config['db_restore_artifacts_dir'] = '{}/artifacts'.format(self.install_config['tmp_dir'])
+            self.install_config['db_source_file_name'] = self.install_config['db_source_file_name'][0]
 
         # 如果实例将被用作基础数据库, 将总是执行 init_db 和 dataloader
         #if self.install_config['flags'] & install_flgs.as_base_db == install_flgs.as_base_db:
@@ -263,7 +264,7 @@ def parse_args():
     arg_install_method_group.add_argument(
         '--restore-install',
         action=CusAction,
-        cus_dest='db_source',  # 用来存储备份数据库名字
+        cus_dest='db_source_file_name',  # 用来存储备份数据库名字
         nargs=1,  # 此处需要一个参数, 用来指定备份数据库的名字
         const=install_flgs.restore_install,  # 0
         help='''During the installation, it will not initialize database and create tables etc.,

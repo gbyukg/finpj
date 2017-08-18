@@ -253,7 +253,7 @@ upgrade_package()
 
     [[ ! -f "${pack_list_file}" ]] \
         && _green_echo "No upgrade package found." \
-        && exit 0
+        && return 0
 
     # 更新基础包中的 SugarInstanceManager 配置
     cd "${TMP_DIR}/ibm/SugarInstanceManager" || __err "$LINENO" "SugarInstanceManager folder does not exist."
@@ -361,8 +361,14 @@ backup_db()
 
 db_restore() {
     _print_msg "Restoring DB"
-    BACKUP_DB_TIMESTAMP=20170804042104
-    BACKUP_FILENAME=SALECONN.0.btit.DBPART000.20170804042104.001
+    # DB_SOURCE_FILE_NAME=SALECONN.0.btit.DBPART000.20170804042104.001
+    local _BACKUP_DB_TIMESTAMP=${DB_SOURCE_FILE_NAME%.*}
+    local BACKUP_DB_TIMESTAMP=${_BACKUP_DB_TIMESTAMP##*.}
+    local DB_SOURCE=${DB_SOURCE_FILE_NAME%%.*}
+
+    __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "DB_SOURCE_FILE_NAME: ${DB_SOURCE_FILE_NAME}"
+    __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "BACKUP_DB_TIMESTAMP: ${BACKUP_DB_TIMESTAMP}"
+    __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "DB_SOURCE: ${DB_SOURCE}"
 
     [[ -d "${DB_RESTORE_LOGPATH}" ]] && rm -rf "${DB_RESTORE_LOGPATH}"
     [[ -d "${DB_RESTORE_LOGTARGET}" ]] && rm -rf "${DB_RESTORE_LOGTARGET}"
@@ -385,7 +391,7 @@ db_restore() {
         echo -e "\n[INFO] Generating 'Redirect Restore' script..."
         GENERATE_SCRIPT=$({
 
-        if [ "$(db2ckbkp -H ${DBSOURCE_DIR}/${BACKUP_FILENAME} | grep -c "(Offline)")" -ge 1 ]; then
+        if [ "$(db2ckbkp -H ${DBSOURCE_DIR}/${DB_SOURCE_FILE_NAME} | grep -c "(Offline)")" -ge 1 ]; then
             echo -e  "Offline image"
             db2 "restore db ${DB_SOURCE} from ${DBSOURCE_DIR} TAKEN AT ${BACKUP_DB_TIMESTAMP} INTO ${DB_NAME} REDIRECT generate script ${DB_RESTORE_ARTIFACTS_DIR}/db2_redirect_restore.clp without prompting"
         else
@@ -568,8 +574,11 @@ run_qrr()
     for script in "${qrr_scripts[@]}"; do
         [[ -f "${script}" ]] && rm -rf "${script}"
         cp vendor/sugareps/SugarInstanceManager/templates/scripts/php/$script ./
-        php -f "$script" 2>&1 | tee ${LOG_FILE}
+        php -f "$script" 2>&1 | tee "${TMP_DIR}/${script}.log"
     done
+
+    # QRR 结果将不作为安装流程的状态码
+    return 0
 }
 
 update_conf()
@@ -658,7 +667,7 @@ run_unittest()
     fi
 
     # 总是返回 0
-    exit 0
+    return 0
 }
 
 before_install()
