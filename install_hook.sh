@@ -106,8 +106,11 @@ info()
     [[ -d /usr/share/cowsay ]] && \
         curl http://proverbs-app.antjan.us/random | cowsay -f $(basename $(ls /usr/share/cowsay/*.cow | sort -R | head -1))
 
-    echo -e "\n"
-    _green_echo "${WEB_HOST}/${INSTANCE_NAME}"
+    echo -e "\n\n"
+    _green_echo "SC4IBM: ${WEB_HOST}/${INSTANCE_NAME}"
+    [[ $(($FLAGS & $BP_INSTANCE)) -eq $BP_INSTANCE ]] \
+        && echo -e "\n" \
+        && _green_echo "SC4BP ${WEB_HOST}/bp${INSTANCE_NAME}"
     echo -e "\n\n\n"
 }
 
@@ -777,6 +780,8 @@ after_install()
     [[ $(($FLAGS & $AS_BASE_DB)) -eq $AS_BASE_DB ]] \
         && __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Backup database" \
         && backup_db
+
+    _green_echo "Finish"
 }
 
 __main()
