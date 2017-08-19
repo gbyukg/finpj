@@ -56,6 +56,8 @@ class Install(object):
             self.install_config['db_restore_logtarget'] = '{}/log_target'.format(self.install_config['tmp_dir'])
             self.install_config['db_restore_artifacts_dir'] = '{}/artifacts'.format(self.install_config['tmp_dir'])
             self.install_config['db_source_file_name'] = self.install_config['db_source_file_name'][0]
+        else:
+            self.install_config['flags'] |= install_flgs.init_db
 
         # 如果实例将被用作基础数据库, 将总是执行 init_db 和 dataloader
         #if self.install_config['flags'] & install_flgs.as_base_db == install_flgs.as_base_db:
