@@ -39,13 +39,13 @@ def jsonEditorOptions = Boon.fromJson(/{
                                 title: "",
                                 readOnly: "true",
                             },
-                            GIT : {
+                            git : {
                                 title: "GIT PRs or branches",
                                 type: "string",
                                 format: "textarea",
                                 input_height: "60px",
                             },
-                            PACKAGE : {
+                            package : {
                                 title: "Install & upgrade packages",
                                 type: "string",
                                 format: "textarea",
@@ -70,32 +70,32 @@ def jsonEditorOptions = Boon.fromJson(/{
                                 hiddenTitle: "true",
                                 readOnly: "true",
                             },
-                            BASE_DB : {
+                            base_db : {
                                 title: "Base DB",
                                 description: "\nChoice which DB you want to use as a base DB, the process will create A new SC Instance base on your choice.",
                                 type: "string",
                                 enum: [' ', ${base_db_imgs}],
                                 propertyOrder : 1,
                             },
-                            RUN_DATALOADER: {
+                            run_dataloader: {
                                 type: "boolean",
                                 format: "checkbox",
                                 title: "Import dataloader",
                                 propertyOrder : 2,
                             },
-                            RUN_AVL: {
+                            run_avl: {
                                 type: "boolean",
                                 format: "checkbox",
                                 title: "Import AVLs",
                                 propertyOrder : 3,
                             },
-                            RUN_UNIT: {
+                            run_unit: {
                                 type: "boolean",
                                 format: "checkbox",
                                 title: "Run PHP UT",
                                 propertyOrder : 4,
                             },
-                            AS_BASE_DB: {
+                            as_base_db: {
                                 type: "boolean",
                                 format: "checkbox",
                                 title: "As base DB img",
@@ -104,42 +104,42 @@ def jsonEditorOptions = Boon.fromJson(/{
                         }
                     }
                 },
-                KEEP_LIVE : {
+                keep_live : {
                     type: "string",
                     format: "number",
                     title: "How log you want to keep the instance",
                     description: "1 ~ 30",
                     propertyOrder : 3
                 },
-                INSTALL_BP: {
+                install_bp: {
                     type: "boolean",
                     format: "checkbox",
                     title: "Install SC4BP instance",
                     propertyOrder : 4
                 },
-                INDEPENDENT_ES: {
+                independent_es: {
                     type: "boolean",
                     format: "checkbox",
                     title: 'Create a independent ES',
                     propertyOrder : 5
                 },
-                RUN_QRR: {
+                run_qrr: {
                     type: "boolean",
                     format: "checkbox",
                     title: 'Run QRR after installation',
                     propertyOrder : 6
                 },
-                INSTANCE_NAME: {
+                instance_name: {
                     type: "string",
                     title: "Instance Name",
                     propertyOrder : 7
                 },
-                DB_NAME: {
+                db_name: {
                     type: "string",
                     title: "Instance DB Name",
                     propertyOrder : 8
                 },
-                ATOI_INSTALL_HOOK: {
+                atoi_install_hook: {
                     type: "string",
                     title: "Custom instance Hooks",
                     propertyOrder : 9
@@ -148,37 +148,37 @@ def jsonEditorOptions = Boon.fromJson(/{
         },
 
         startval: {
-            KEEP_LIVE: 3,
-            INSTALL_BP : 0,
-            INDEPENDENT_ES : 0,
-            INSTANCE_NAME : '',
-            DB_NAME : "",
-            RUN_QRR : '',
-            ATOI_INSTALL_HOOK : '',
+            keep_live: 3,
+            install_bp : 0,
+            independent_es : 0,
+            instance_name : '',
+            db_name : "",
+            run_qrr : '',
+            atoi_install_hook : '',
             source_from : [
                 {
-                    name: 'GIT',
-                    GIT: ''
+                    name: 'git',
+                    git: ''
                 },
                 {
-                    name: 'PACKAGE',
-                    PACKAGE: ''
+                    name: 'package',
+                    package: ''
                 }
             ],
             install_method: [
                 {
                     name: 'RESTORE',
-                    BASE_DB: '',
-                    RUN_DATALOADER: '',
-                    RUN_AVL: '',
-                    RUN_UNIT: 1,
+                    base_db: '',
+                    run_dataloader: '',
+                    run_avl: '',
+                    run_unit: 1,
                 },
                 {
                     name: 'FULL_INSTALL',
-                    RUN_DATALOADER: 1,
-                    RUN_AVL: 1,
-                    RUN_UNIT: 1,
-                    AS_BASE_DB: 0,
+                    run_dataloader: 1,
+                    run_avl: 1,
+                    run_unit: 1,
+                    as_base_db: 0,
                 }
             ],
         }
