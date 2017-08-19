@@ -40,7 +40,7 @@ install_parameters = "{} {} {} {} {} {} --keep-alive {} {} {} {} --instance-name
     '--data-loader' if extend_par['run_dataloader'] else '',
     '--avl' if extend_par['run_avl'] else '',
     '--ut' if extend_par['run_unit'] else '',
-    '--as-base-db' if extend_par['as_base_db'] else '',
+    '--as-base-db' if extend_par.get('as_base_db', None) else '',
     params['keep_live'] if params['keep_live'] else '3',
     '--bp-instance' if params['install_bp'] else '',
     '--independent-es' if params['independent_es'] else '',
