@@ -140,7 +140,7 @@ prepare_source_from_pr()
     _print_msg "Preparing git..."
 
     local PR_NUMS=($@)
-    local git_refs="git@github.com:sugareps/Mango.git +refs/heads/*:refs/remotes/sugareps/*"
+    local git_refs=""
     local check_ref=''
     local merge_ref=''
     local middle_ref=''
@@ -155,14 +155,20 @@ prepare_source_from_pr()
         info=($par)
         unset IFS
 
+        git_base_refs="git@github.com:${info[1]}/Mango.git"
+
         if [[ "X${info[0]}" == 'Xpr' ]]; then
-            git_refs="${git_refs} +refs/pull/*/head:refs/remotes/${info[1]}/pr/*"
+            git_refs="${git_base_refs} +refs/pull/*/head:refs/remotes/${info[1]}/pr/*"
             # 以 / 结尾, git checkout -f sugareps//ibm_r40 将报错, 无法找到匹配
             middle_ref='pr/'
         else
-            git_refs="${git_refs} +refs/heads/*:refs/remotes/${info[1]}/*"
+            git_refs="${git_base_refs} +refs/heads/*:refs/remotes/${info[1]}/*"
             middle_ref=''
         fi
+
+        _green_echo "Fetching code ${info[1]}/${info[2]} ... "
+        __logging "${FUNCNAME[0]}" "$LINENO" "[info]" "fetch ref: ${git_refs}"
+        __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "git fetch ${git_refs}" #|| __err "$LINENO" "git fetch failed."
 
         if [[ -z "${check_ref}" ]]; then
             check_ref="${info[1]}/${middle_ref}${info[2]}"
@@ -173,9 +179,6 @@ prepare_source_from_pr()
 
     __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "git reset --hard"
     __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "git clean -fd"
-
-    __logging "${FUNCNAME[0]}" "$LINENO" "[info]" "fetch ref: ${git_refs}"
-    __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "git fetch ${git_refs}" #|| __err "$LINENO" "git fetch failed."
 
     __logging "${FUNCNAME[0]}" "$LINENO" "[info]" "fetch check ref: ${check_ref}"
     __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "git checkout -f ${check_ref}"
@@ -665,8 +668,7 @@ run_unittest()
 
     vendor_unit="${WEB_DIR}"/"${INSTANCE_NAME}"/vendor/bin/phpunit
     if [[ -f "${vendor_unit}" ]]; then
-        chmod o+x "${vendor_unit}"
-        "${vendor_unit}"
+        php "${vendor_unit}"
     else
         phpunit
     fi
