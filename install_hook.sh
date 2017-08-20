@@ -597,6 +597,23 @@ update_conf()
 
     # htaccess 配置
     __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "sed 's/\^INSTANCE_NAME\^/${INSTANCE_NAME}/g' ./configs/htaccess > ${WEB_DIR}/${INSTANCE_NAME}/.htaccess"
+
+    generate_config_override()
+    {
+        cat <<CONFIG_OVERRIDE > ${WEB_DIR}/${INSTANCE_NAME}/gen_config_override.php
+<?php
+if(!defined('sugarEntry'))define('sugarEntry', true);
+
+require_once('include/entryPoint.php');
+include 'custom/install/SalesConnectInstaller.php';
+
+SalesConnectInstaller::executeTask('UpdateConfigFile');
+CONFIG_OVERRIDE
+
+        cd "${WEB_DIR}/${INSTANCE_NAME}" || __err "$LINENO" "${WEB_DIR}/${INSTANCE_NAME} folder does not exist."
+        __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "php gen_config_override.php"
+    }
+    generate_config_override
 }
 
 run_dataloader()
