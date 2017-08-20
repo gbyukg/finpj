@@ -576,8 +576,9 @@ run_qrr()
 
     for script in "${qrr_scripts[@]}"; do
         [[ -f "${script}" ]] && rm -rf "${script}"
-        cp vendor/sugareps/SugarInstanceManager/templates/scripts/php/$script ./
-        php -f "$script" 2>&1 | tee "${TMP_DIR}/${script}.log"
+        [[ -f vendor/sugareps/SugarInstanceManager/templates/scripts/php/$script ]] \
+            && cp vendor/sugareps/SugarInstanceManager/templates/scripts/php/$script ./
+        php -f "$script" > "${TMP_DIR}/${script}.log" 2>&1
     done
 
     # QRR 结果将不作为安装流程的状态码
@@ -664,7 +665,8 @@ run_unittest()
 
     vendor_unit="${WEB_DIR}"/"${INSTANCE_NAME}"/vendor/bin/phpunit
     if [[ -f "${vendor_unit}" ]]; then
-        php "${vendor_unit}"
+        chmod o+x "${vendor_unit}"
+        "${vendor_unit}"
     else
         phpunit
     fi
@@ -766,11 +768,6 @@ after_install()
         && __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Import AVL" \
         && run_avl
 
-    # run UnitTest
-    [[ $(($FLAGS & $UT)) -eq $UT ]] \
-        && __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Run UnitTest" \
-        && run_unittest
-
     # 是否要跑 QRR, 应该在数据库备份之前
     [[ $(($FLAGS & $QRR)) -eq $QRR ]] \
         && __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Run QRR" \
@@ -780,6 +777,11 @@ after_install()
     [[ $(($FLAGS & $AS_BASE_DB)) -eq $AS_BASE_DB ]] \
         && __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Backup database" \
         && backup_db
+
+    # run UnitTest
+    [[ $(($FLAGS & $UT)) -eq $UT ]] \
+        && __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Run UnitTest" \
+        && run_unittest
 
     _green_echo "Finish"
 }
