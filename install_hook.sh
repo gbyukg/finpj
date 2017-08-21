@@ -243,12 +243,17 @@ prepare_source_from_package()
     __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "unzip -o ${TMP_DIR}/${base_package} \"SugarUlt-Full-7.6.0/*\" -d ${WEB_DIR}/ > /dev/null"
     __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "mv ${WEB_DIR}/SugarUlt-Full-7.6.0 ${WEB_DIR}/${INSTANCE_NAME}"
 
+    # 升级补丁包时会通过判断 SC instance 中是否有 install.log 文件来确定是否是正确是实例目录
+    # 如果是通过恢复安装, 并不会产生 install.log 文件, 因此需要手动创建一个
+    touch "${WEB_DIR}/${INSTANCE_NAME}"/install.log
+
     # 包安装时不需要跑 federation 脚本
     # 在最后一个包安装完成后, 跑最后一个包中的脚本
     mv "${WEB_DIR}/${INSTANCE_NAME}"/custom/install/federated_db_environment/sql "${TMP_DIR}"/sql-back
 
     # 解压基础包中的 SugarInstanceManger
     __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "unzip -o ${TMP_DIR}/${base_package} \"ibm/SugarInstanceManager/*\" -d ${TMP_DIR}/ > /dev/null"
+    __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "cp -r ${TMP_DIR}/ibm/SugarInstanceManager ${WEB_DIR}/${INSTANCE_NAME}/vendor/sugareps/"
 }
 
 upgrade_package()
@@ -593,7 +598,7 @@ update_conf()
     __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Update sugar instance config.php"
 
     # config.php DB 配置
-    __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "sed 's/\^DB_HOST\^/${DB_HOST}/g; s/\^DB_NAME\^/${DB_NAME}/g; s/\^DB_ADMIN_USR\^/${DB_ADMIN_USR}/g; s/\^DB_ADMIN_PWD\^/${DB_ADMIN_PWD}/g' ${PROJECT_DIR}/configs/config.php > ${WEB_DIR}/${INSTANCE_NAME}/config.php"
+    __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "sed 's!\^DB_HOST\^!${DB_HOST}!g; s!\^DB_NAME\^!${DB_NAME}!g; s!\^DB_ADMIN_USR\^!${DB_ADMIN_USR}!g; s!\^DB_ADMIN_PWD\^!${DB_ADMIN_PWD}!g; s!\^SERVER_HOSTNAME\^!${WEB_HOST}!g; s!\^INSTANCE_NAME\^!${INSTANCE_NAME}!g' ${PROJECT_DIR}/configs/config.php > ${WEB_DIR}/${INSTANCE_NAME}/config.php"
 
     # htaccess 配置
     __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "sed 's/\^INSTANCE_NAME\^/${INSTANCE_NAME}/g' ./configs/htaccess > ${WEB_DIR}/${INSTANCE_NAME}/.htaccess"
@@ -721,7 +726,6 @@ before_install()
 
 install_bp()
 {
-    set -x
     _print_msg "Starting to install BP instance..."
 
     local bp_instance_name="bp${INSTANCE_NAME}"

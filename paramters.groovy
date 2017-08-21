@@ -43,6 +43,7 @@ def jsonEditorOptions = Boon.fromJson(/{
                                 title: "GIT PRs or branches",
                                 type: "string",
                                 format: "textarea",
+                                description: "\nYou can provide one or more RP numbers to install a new SC base on some particular PRs\n, or provide one or more Git branchs.\n PR number and Git branch can be used together.\n For example: 1234\nsugareps:ibm_r40\nzzlzhang:ibms_1234",
                                 input_height: "60px",
                             },
                             package : {
