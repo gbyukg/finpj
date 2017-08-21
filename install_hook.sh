@@ -111,6 +111,8 @@ info()
     [[ $(($FLAGS & $BP_INSTANCE)) -eq $BP_INSTANCE ]] \
         && echo -e "\n" \
         && _green_echo "SC4BP ${WEB_HOST}/bp${INSTANCE_NAME}"
+    echo -e "\n"
+    _green_echo "DB info:  ${DB_NAME}"
     echo -e "\n\n\n"
 }
 
