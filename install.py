@@ -8,11 +8,14 @@ Created on 2017年7月24日
 
 import os
 import sys
+import json
 import requests
 import datetime
 from argparse import ArgumentParser, Action
 from finpj import *
 
+reload(sys)
+sys.setdefaultencoding('utf-8')
 
 install_flgs = InstallFlag(
     0x00,  # source_from_package
@@ -129,6 +132,7 @@ class Install(object):
         refs = ''
         for sour in self.install_config['source_code']:
             try:
+                # 检测是否是数字, 如果是数字, 则说明是 PR number
                 float(sour)
             except ValueError:
                 # branch
@@ -139,12 +143,22 @@ class Install(object):
                     br_name = sour
                 refs = '{}br:{:s}:{:s} '.format(refs, br_ref, br_name)
             else:
-                # PR
-                '''
-                pr_info = jsloads(self._get_pr_info(sour))
-                if pr_info['merged']:
-                    raise "PR [{:s}] already has been merged, can not install from it.".format(sour)
-                '''
+                # 没有异常发生, 说明是 PR 号
+                try:
+                    pr_info = json.loads(self._get_pr_info(sour))
+                except requests.HTTPError as e:
+                    return_code = e.response.status_code
+                    err_code = {
+                        401: "Error: GitHub API authorize failed.",
+                        404: "Error: PR number [{}] can not be found.".format(sour),
+                    }
+                    raise SystemExit(err_code.get(return_code, 'Unknown error, Github API return code is {}'.format(e.response.status_code)))
+                else:
+                    if pr_info['merged']:
+                        raise "Error: PR [{:s}] already has been merged, can not install from it.".format(sour)
+                    print_msg('\nPR number: {:s}'.format(sour))
+                    print_msg(pr_info['title'])
+
                 refs = '{}pr:sugareps:{:s} '.format(refs, sour)
 
         refs = refs.strip()
