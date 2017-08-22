@@ -752,7 +752,7 @@ install_bp()
     # 删除 cache 缓存文件
     if [ -d "${bp_instance_web}/cache" ]; then
         rm -Rf "${bp_instance_web}/cache"
-        ln -s "${bp_instance_web}/cache" "${bp_instance_web}/cache"
+        ln -s "${WEB_DIR}/${INSTANCE_NAME}/cache" "${bp_instance_web}/cache"
     fi
 
     cat <<ORDER > ${sc4bp_script_path}/sc4bp_order.php
