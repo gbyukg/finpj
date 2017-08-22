@@ -109,10 +109,10 @@ info()
     echo -e "\n\n"
     _green_echo "SC4IBM: ${WEB_HOST}/${INSTANCE_NAME}"
     [[ $(($FLAGS & $BP_INSTANCE)) -eq $BP_INSTANCE ]] \
-        && echo -e "\n" \
-        && _green_echo "SC4BP ${WEB_HOST}/bp${INSTANCE_NAME}"
-    echo -e "\n"
+        && _green_echo "SC4BP ${WEB_HOST}/${INSTANCE_NAME}_bp"
+    _green_echo "WEB IDE: ${WEB_HOST}/${INSTANCE_NAME}/sc_webide"
     _green_echo "DB info:  ${DB_NAME}"
+    echo -e "\n"
     echo -e "\n\n\n"
 }
 
@@ -730,7 +730,8 @@ install_bp()
 {
     _print_msg "Starting to install BP instance..."
 
-    local bp_instance_name="bp${INSTANCE_NAME}"
+    local bp_instance_name="${INSTANCE_NAME}_bp"
+    local bp_instance_web="${WEB_DIR}/${INSTANCE_NAME}_bp"
     local sc4bp_script_path=''
 
     if [[ $(($FLAGS & $SOURCE_FROM_GIT)) -eq $SOURCE_FROM_PACKAGE ]]; then
@@ -742,16 +743,16 @@ install_bp()
 
     __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "sc4bp_script_path: ${sc4bp_script_path}"
 
-    [[ -d "${WEB_DIR}/${bp_instance_name}" ]] && rm -Rf "${WEB_DIR}/${bp_instance_name}"
-    cp -rp "${WEB_DIR}/${INSTANCE_NAME}" "${WEB_DIR}/${bp_instance_name}"
+    [[ -d "${bp_instance_web}" ]] && rm -Rf "${bp_instance_web}"
+    cp -rp "${bp_instance_web}" "${bp_instance_web}"
 
     # 修正 .htaccess 文件
-    __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "sed 's^/${INSTANCE_NAME}^/${bp_instance_name}^g' ${WEB_DIR}/${INSTANCE_NAME}/.htaccess > ${WEB_DIR}/${bp_instance_name}/.htaccess"
+    __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "sed 's^/${INSTANCE_NAME}^/${bp_instance_name}^g' ${WEB_DIR}/${INSTANCE_NAME}/.htaccess > ${bp_instance_web}/.htaccess"
 
     # 删除 cache 缓存文件
-    if [ -d "${WEB_DIR}/${bp_instance_name}/cache" ]; then
-        rm -Rf "${WEB_DIR}/${bp_instance_name}/cache"
-        ln -s "${WEB_DIR}/${INSTANCE_NAME}/cache" "${WEB_DIR}/${bp_instance_name}/cache"
+    if [ -d "${bp_instance_web}/cache" ]; then
+        rm -Rf "${bp_instance_web}/cache"
+        ln -s "${bp_instance_web}/cache" "${bp_instance_web}/cache"
     fi
 
     cat <<ORDER > ${sc4bp_script_path}/sc4bp_order.php
@@ -762,13 +763,33 @@ foreach(\$orderedFiles as \$scripts) {
 }
 ORDER
 
+    cd "${bp_instance_web}"
     for script in $(php ${sc4bp_script_path}/sc4bp_order.php); do
         _green_echo "Run sc4bp script [${script}]"
-        cp -r "${sc4bp_script_path}/${script}" "${bp_instance_name}"
-        __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "run sc4bp script: ${bp_instance_name}/${script}"
-        php "${bp_instance_name}/${script}"
+        __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "cp -r ${sc4bp_script_path}/${script} ${bp_instance_web}/${script}"
+        __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "run sc4bp script: ${bp_instance_web}/${script}"
+        __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "php ${bp_instance_web}/${script}"
     done
+
     return 0
+}
+
+setup_webide()
+{
+    local sc_webide_path=${HOME}/www/sc_webide
+    [[ ! -d ${sc_webide_path} ]] \
+        && echo 'no web ide found.' \
+        &&  return 0
+
+    cp -r "${sc_webide_path}" "${WEB_DIR}/${INSTANCE_NAME}"
+
+    IN_WEBIDE=${WEB_DIR}/${INSTANCE_NAME}/sc_webide
+    IN_WEBIDE_URL="${WEB_HOST}/${INSTANCE_NAME}/sc_webide"
+
+    sed -i "s^#path#^"${IN_WEBIDE}"^g" "${IN_WEBIDE}"/config.php
+    sed -i "s^#url#^"${IN_WEBIDE_URL}"^g" "${IN_WEBIDE}"/config.php
+
+    mkdir "${IN_WEBIDE}"/workspace && ln -s  "${WEB_DIR}/${INSTANCE_NAME}" "${IN_WEBIDE}/workspace/sc"
 }
 
 after_install()
@@ -807,6 +828,8 @@ after_install()
     [[ $(($FLAGS & $UT)) -eq $UT ]] \
         && __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Run UnitTest" \
         && run_unittest
+
+    setup_webide
 
     _green_echo "Finish"
 }
