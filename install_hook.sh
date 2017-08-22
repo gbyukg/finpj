@@ -762,7 +762,7 @@ foreach(\$orderedFiles as \$scripts) {
 }
 ORDER
 
-    for script in $(php SOURCE_FROM_PACKAGE/sc4bp_order.php); do
+    for script in $(php ${sc4bp_script_path}/sc4bp_order.php); do
         _green_echo "Run sc4bp script [${script}]"
         cp -r "${sc4bp_script_path}/${script}" "${bp_instance_name}"
         __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "run sc4bp script: ${bp_instance_name}/${script}"
