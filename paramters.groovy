@@ -81,13 +81,13 @@ def jsonEditorOptions = Boon.fromJson(/{
                             run_dataloader: {
                                 type: "boolean",
                                 format: "checkbox",
-                                title: "Import dataloader",
+                                title: "Import dataloader(There is no need to run dataloader if you choiced a Base DB.)",
                                 propertyOrder : 2,
                             },
                             run_avl: {
                                 type: "boolean",
                                 format: "checkbox",
-                                title: "Import AVLs",
+                                title: "Import AVLs(There is no need to run AVL if you choiced a Base DB.)",
                                 propertyOrder : 3,
                             },
                             run_unit: {

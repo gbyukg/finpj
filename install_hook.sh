@@ -728,7 +728,6 @@ before_install()
 
 install_bp()
 {
-    set -x
     _print_msg "Starting to install BP instance..."
 
     local bp_instance_name="${INSTANCE_NAME}_bp"
@@ -769,7 +768,8 @@ ORDER
         _green_echo "Run sc4bp script [${script}]"
         __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "cp -r ${sc4bp_script_path}/${script} ${bp_instance_web}/${script}"
         __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "run sc4bp script: ${bp_instance_web}/${script}"
-        __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "php ${bp_instance_web}/${script}"
+        php ${script}
+        # __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "php ${bp_instance_web}/${script}"
     done
 
     return 0
