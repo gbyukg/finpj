@@ -728,10 +728,11 @@ before_install()
 
 install_bp()
 {
+    set -x
     _print_msg "Starting to install BP instance..."
 
     local bp_instance_name="${INSTANCE_NAME}_bp"
-    local bp_instance_web="${WEB_DIR}/${INSTANCE_NAME}_bp"
+    local bp_instance_web="${WEB_DIR}/${bp_instance_name}"
     local sc4bp_script_path=''
 
     if [[ $(($FLAGS & $SOURCE_FROM_GIT)) -eq $SOURCE_FROM_PACKAGE ]]; then
@@ -745,9 +746,6 @@ install_bp()
 
     [[ -d "${bp_instance_web}" ]] && rm -Rf "${bp_instance_web}"
     cp -rp "${WEB_DIR}/${INSTANCE_NAME}" "${bp_instance_web}"
-    echo "\$sugar_config['bp_install'] = true;" >> ${bp_instance_web}/config_override.php
-    echo "\$sugar_config['is_bp'] = true;" >> ${bp_instance_web}/config_override.php
-    echo "\$sugar_config['cluster_name'] = 'SC4BP';" >> ${bp_instance_web}/config_override.php
 
     # 修正 .htaccess 文件
     __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "sed 's^/${INSTANCE_NAME}^/${bp_instance_name}^g' ${WEB_DIR}/${INSTANCE_NAME}/.htaccess > ${bp_instance_web}/.htaccess"
