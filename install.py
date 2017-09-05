@@ -155,7 +155,7 @@ class Install(object):
                     raise SystemExit(err_code.get(return_code, 'Unknown error, Github API return code is {}'.format(e.response.status_code)))
                 else:
                     if pr_info['merged']:
-                        raise "Error: PR [{:s}] already has been merged, can not install from it.".format(sour)
+                        raise SystemExit("Error: PR [{:s}] already has been merged, can not install from it.\n".format(sour))
                     print_msg('\nPR number: {:s}'.format(sour))
                     print_msg(pr_info['title'])
 
@@ -376,16 +376,19 @@ def parse_args():
 
     args = vars(parser.parse_args())
 
+    exitMsg = 0
     try:
         {
             'install_sc': Install,
         }[args['func']](**args)
     except KeyError as e:
-        raise SystemExit("Error: Key [{:s}] does not exists.".format(e))
+        exitMsg = "Error: Key [{:s}] does not exists.".format(e)
     except AttributeError as e:
-        raise SystemError("Error: Attribute [{:s}] does not exists.".format(e))
+        exitMsg = "Error: Attribute [{:s}] does not exists.".format(e)
     except Exception as e:
-        raise SystemError(e)
+        exitMsg = e
+    finally:
+        sys.exit(exitMsg)
 
 
 # Namespace(func='install_sc', restore_install=False, source_code=['11223', 'sugareps:ibm_r40', 'prod.zip'])
