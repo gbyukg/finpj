@@ -152,10 +152,12 @@ class Install(object):
                         401: "Error: GitHub API authorize failed.",
                         404: "Error: PR number [{}] can not be found.".format(sour),
                     }
-                    raise SystemExit(err_code.get(return_code, 'Unknown error, Github API return code is {}'.format(e.response.status_code)))
+                    print_msg('Unknown error, Github API return code is {}'.format(e.response.status_code))
+                    SystemExit(err_code.get(return_code, 'Unknown error, Github API return code is {}'.format(e.response.status_code)))
                 else:
                     if pr_info['merged']:
-                        raise SystemExit("Error: PR [{:s}] already has been merged, can not install from it.\n".format(sour))
+                        print_msg("Error: PR [{:s}] already has been merged, can not install from it.\n".format(sour))
+                        SystemExit("Error: PR [{:s}] already has been merged, can not install from it.\n".format(sour))
                     print_msg('\nPR number: {:s}'.format(sour))
                     print_msg(pr_info['title'])
 
