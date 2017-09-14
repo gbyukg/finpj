@@ -576,7 +576,7 @@ run_qrr()
     local qrr_scripts[0]='cacheCleanup'
     local qrr_scripts[1]='runFileMapBuildCache.php'
     local qrr_scripts[2]='runRebuildSugarLogicFunctions.php'
-    local qrr_scripts[3]='runQuickRepair.php'
+    local qrr_scripts[3]='runQuickRepair.php true true'
     local qrr_scripts[4]='showQuickRepairSQL.php'
     local qrr_scripts[5]='runRebuildJSGroupings.php'
     local qrr_scripts[6]='runRebuildSprites.php'
