@@ -111,8 +111,13 @@ info()
     [[ $(($FLAGS & $BP_INSTANCE)) -eq $BP_INSTANCE ]] \
         && _green_echo "SC4BP ${WEB_HOST}/${INSTANCE_NAME}_bp"
     _green_echo "WEB IDE: ${WEB_HOST}/${INSTANCE_NAME}/sc_webide"
-    _green_echo "DB info:  ${DB_NAME}"
     echo -e "\n"
+    _green_echo "SSH info:"
+    _green_echo "ssh btit@${DB_HOST} | PWD: btit@ibm"
+    echo -e "\n"
+    _green_echo "DB info:"
+    _green_echo "Host: ${DB_HOST} | Port: ${DB_PORT}"
+    _green_echo "DB Name: ${DB_NAME} | DB User: ${DB_ADMIN_USR} | DB PWD: ${DB_ADMIN_PWD}"
     echo -e "\n\n\n"
 }
 
