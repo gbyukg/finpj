@@ -23,10 +23,14 @@ drop_db()
     local db_name=${1}
     printf "Drop database %s ...\n" "${db_name}"
 
-    for app in $(db2 list applications for database ${db_name} | awk '/[0-9]/{print $3}')
-    do
-        db2 "force application ( $app )"
-    done
+    apps=$(db2 list applications for database ${db_name})
+    if [[ $? -eq 0 ]]; then
+        for app in $(echo $apps | awk '/[0-9]/{print $3}')
+        do
+            db2 "force application ( $app )"
+        done
+    fi
+
     db2 "DROP DATABASE ${db_name}" # drop the previously existing database if it exists
 
     if [[ $? -ne 0 ]]; then
@@ -41,6 +45,7 @@ drop_db()
 
 clean_logs()
 {
+    rm -rf ${clean_dir}
     > $HOME/www/logs/php_errors.log
     > $HOME/www/logs/access_log
     > $HOME/www/logs/error_log
@@ -68,7 +73,7 @@ GET_DB_NAME
 
     db_name=$(php ${web_dir}/${del_file}/get_db_name.php)
 
-    if [[ -n $db_name && $(grep $db_name db_installed; echo $?) -eq 0 ]]; then
+    if [[ -n $db_name && $(grep $db_name db_installed > /dev/null 2>&1; echo $?) -eq 0 ]]; then
         drop_db $db_name
     fi
 
@@ -83,7 +88,3 @@ GET_DB_NAME
 done
 
 clean_logs
-
-# for i in $(grep 'Database alias' db | cut -d'=' -f2 | cut -d'_' -f2); do [[ -d $i ]] || echo $i; done
-# for i in 2017-*; do for j in $i; do ls $j; done done
-
