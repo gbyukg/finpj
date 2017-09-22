@@ -172,20 +172,19 @@ class InstallSC(object):
         kvargs['install_url'] = '{}/install.php'.format(kvargs['instance_url'])
 
         reqSessiong = requests.Session()
-        for post_data in self._install_params(*args, **kvargs):
-            try:
+        try:
+            for post_data in self._install_params(*args, **kvargs):
                 response = reqSessiong.post(
                     kvargs['install_url'],
                     data=post_data,
                     hooks=dict(response=lambda r, *args, **kvargs: None),
                 )
-            except KeyError as e:
-                raise InstallFailedException("Error: [install_step_by_step] can not find config key: {}".format(e))
-            except Exception as e:
-                raise InstallFailedException("Error: [install_step_by_step] {}".format(e))
-            else:
                 if response.status_code != requests.codes.ok:
                     response.raise_for_status()
+        except KeyError as e:
+            raise InstallFailedException("Error: [install_step_by_step] can not find config key: {}".format(e))
+        except Exception as e:
+            raise InstallFailedException("Error: [install_step_by_step] {}".format(e))
 
     @installHooks('install')
     def install_from_restore(self, *args, **kvargs):
@@ -205,18 +204,18 @@ if __name__ == '__main__':
     try:
         insc(
             sc_license='1234567890',
-            db_name='DB_170',
-            db_host='dev05.rtp.raleigh.ibm.com',
+            db_name='DB_3040',
+            db_host='dev01.rtp.raleigh.ibm.com',
             db_port='50000',
             db_admin_usr='btit',
             db_admin_pwd='btit@ibm',
             fts_type='Elastic',
-            fts_host='dev02.rtp.raleigh.ibm.com',
+            fts_host='dev01.rtp.raleigh.ibm.com',
             fts_port='9200',
             site_admin_user='admin',
             site_admin_pwd='asdf',
-            instance_name='170',
-            web_host='http://dev05.rtp.raleigh.ibm.com',
+            instance_name='304',
+            web_host='http://dev01.rtp.raleigh.ibm.com',
         )
     except InstallFailedException as e:
         print(e)

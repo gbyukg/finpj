@@ -227,7 +227,7 @@ $sugar_config = array (
     'Opportunities' => true,
   ),
   'history_max_viewed' => 50,
-  'host_name' => '^SERVER_HOSTNAME^',
+  'host_name' => '^FULL_HOST_NAME^',
   'import_max_execution_time' => 3600,
   'import_max_records_per_file' => 100,
   'import_max_records_total_limit' => '',

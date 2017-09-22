@@ -388,6 +388,7 @@ def parse_args():
     except AttributeError as e:
         exitMsg = "Error: Attribute [{:s}] does not exists.".format(e)
     except Exception as e:
+        print_msg("ERROR: Catch exception")
         exitMsg = e
     finally:
         sys.exit(exitMsg)

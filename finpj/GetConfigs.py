@@ -11,6 +11,7 @@ from socket import gethostname
 from os import getenv as os_getenv
 import sys
 import ConfigParser
+import uuid
 
 
 '''
@@ -28,7 +29,8 @@ class GetConfigs(object):
         configParrser = ConfigParser.SafeConfigParser(
             {
                 'host_name': gethostname(),
-                'project_dir': project_dir
+                'project_dir': project_dir,
+                'UNIQUE_KEY': uuid.uuid4().hex
             }
         )
         loaded_config_file = configParrser.read(

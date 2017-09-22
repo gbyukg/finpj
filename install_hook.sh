@@ -604,8 +604,11 @@ update_conf()
 {
     __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Update sugar instance config.php"
 
+    # UNIQUE_KEY=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Generate UNIQUE_KEY: ${UNIQUE_KEY}"
+
     # config.php DB 配置
-    __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "sed 's!\^DB_HOST\^!${DB_HOST}!g; s!\^DB_NAME\^!${DB_NAME}!g; s!\^DB_ADMIN_USR\^!${DB_ADMIN_USR}!g; s!\^DB_ADMIN_PWD\^!${DB_ADMIN_PWD}!g; s!\^SERVER_HOSTNAME\^!${WEB_HOST}!g; s!\^INSTANCE_NAME\^!${INSTANCE_NAME}!g' ${PROJECT_DIR}/configs/config.php > ${WEB_DIR}/${INSTANCE_NAME}/config.php"
+    __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "sed 's!\^DB_HOST\^!${DB_HOST}!g; s!\^DB_NAME\^!${DB_NAME}!g; s!\^DB_ADMIN_USR\^!${DB_ADMIN_USR}!g; s!\^DB_ADMIN_PWD\^!${DB_ADMIN_PWD}!g; s!\^SERVER_HOSTNAME\^!${WEB_HOST}!g; s!\^INSTANCE_NAME\^!${INSTANCE_NAME}!g; s!\^FULL_HOST_NAME\^!${FULL_HOST_NAME}!g; s!\^UNIQUE_KEY\^!${UNIQUE_KEY}!g' ${PROJECT_DIR}/configs/config.php > ${WEB_DIR}/${INSTANCE_NAME}/config.php"
 
     # htaccess 配置
     __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "sed 's/\^INSTANCE_NAME\^/${INSTANCE_NAME}/g' ./configs/htaccess > ${WEB_DIR}/${INSTANCE_NAME}/.htaccess"
