@@ -578,22 +578,23 @@ run_qrr()
 {
     _print_msg 'Starting to run QRR...'
 
-    local qrr_scripts[0]='cacheCleanup'
-    local qrr_scripts[1]='runFileMapBuildCache.php'
-    local qrr_scripts[2]='runRebuildSugarLogicFunctions.php'
-    local qrr_scripts[3]='runQuickRepair.php true true'
-    local qrr_scripts[4]='showQuickRepairSQL.php'
-    local qrr_scripts[5]='runRebuildJSGroupings.php'
-    local qrr_scripts[6]='runRebuildSprites.php'
-    local qrr_scripts[7]='runRepairRelationships.php'
+    declare -A qrr_scripts
+    qrr_scripts[cacheCleanup]=""
+    qrr_scripts[runFileMapBuildCache.php]=""
+    qrr_scripts[runRebuildSugarLogicFunctions.php]=""
+    qrr_scripts[runQuickRepair.php]="true true"
+    qrr_scripts[showQuickRepairSQL.php]=""
+    qrr_scripts[runRebuildSprites.php]=""
+    qrr_scripts[runRepairRelationships.php]=""
 
     cd "${WEB_DIR}/${INSTANCE_NAME}" || __err "$LINENO" "SC instance directory [${WEB_DIR}/${INSTANCE_NAME}] not exists."
 
-    for script in "${qrr_scripts[@]}"; do
+    for script in "${!qrr_scripts[@]}"; do
         [[ -f "${script}" ]] && rm -rf "${script}"
         [[ -f vendor/sugareps/SugarInstanceManager/templates/scripts/php/$script ]] \
             && cp vendor/sugareps/SugarInstanceManager/templates/scripts/php/$script ./
-        php -f "$script" > "${TMP_DIR}/${script}.log" 2>&1
+        __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "php -f $script ${qrr_scripts[$script]}"
+        php -f "$script" ${qrr_scripts[$script]} > "${TMP_DIR}/${script}.log" 2>&1
     done
 
     # QRR 结果将不作为安装流程的状态码
@@ -602,6 +603,8 @@ run_qrr()
 
 update_conf()
 {
+    _print_msg 'Update configuration'
+
     __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Update sugar instance config.php"
 
     # UNIQUE_KEY=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
