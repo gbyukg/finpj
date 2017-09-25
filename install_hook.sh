@@ -598,6 +598,7 @@ run_qrr()
     done
 
     # QRR 结果将不作为安装流程的状态码
+    curl ${WEB_HOST}
     return 0
 }
 

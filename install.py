@@ -188,13 +188,8 @@ class Install(object):
                恢复安装     :install_from_restore, 必须选择要恢复的数据库
         '''
         insc = InstallSC(self.install_config['flags'] & install_flgs.full_install)
-        try:
-            insc(**self.install_config)
-        except InstallFailedException as e:
-            # stderr
-            raise SystemExit(e)
-        except Exception as e:
-            raise SystemExit(e)
+        
+        insc(**self.install_config)
 
 
 class CusAction(Action):
@@ -388,9 +383,9 @@ def parse_args():
     except AttributeError as e:
         exitMsg = "Error: Attribute [{:s}] does not exists.".format(e)
     except Exception as e:
-        print_msg("ERROR: Catch exception")
         exitMsg = e
     finally:
+        print_err(exitMsg)
         sys.exit(exitMsg)
 
 

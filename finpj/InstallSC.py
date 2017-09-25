@@ -183,7 +183,7 @@ class InstallSC(object):
                     response.raise_for_status()
         except KeyError as e:
             raise InstallFailedException("Error: [install_step_by_step] can not find config key: {}".format(e))
-        except Exception as e:
+        except requests.HTTPError as e:
             raise InstallFailedException("Error: [install_step_by_step] {}".format(e))
 
     @installHooks('install')
