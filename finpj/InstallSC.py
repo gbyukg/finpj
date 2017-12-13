@@ -182,7 +182,7 @@ class InstallSC(object):
                     hooks=dict(response=lambda r, *args, **kvargs: None),
                 )
                 if 'current_step' in post_data:
-                    log_file = '{:s}/{:s}.html'.format(self.install_config["tmp_dir"], post_data['current_step'])
+                    log_file = '{:s}/{:s}.html'.format(self.install_config["tmp_dir"], str(post_data['current_step']))
                     with open(log_file, 'w') as f:
                         f.write(response.text)
                 if response.status_code != requests.codes.ok:
