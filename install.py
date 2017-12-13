@@ -187,8 +187,8 @@ class Install(object):
                一步一步安装 :install_step_by_step
                恢复安装     :install_from_restore, 必须选择要恢复的数据库
         '''
-        insc = InstallSC(self.install_config['flags'] & install_flgs.full_install)
-        
+        insc = InstallSC(self.install_config['flags'] & install_flgs.full_install, conf=self.install_config)
+
         insc(**self.install_config)
 
 
