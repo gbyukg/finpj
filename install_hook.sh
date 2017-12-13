@@ -128,7 +128,7 @@ build_code()
     _print_msg "building code..."
     __command_logging_and_exit \
         "${FUNCNAME[0]}" "$LINENO" \
-        "cd ${GIT_DIR}/build/rome && php build.php -clean -cleanCache -flav=ult -ver='7.1.5' -dir=sugarcrm -build_dir=${BUILD_DIR}"
+        "cd ${GIT_DIR}/build/rome && php build.php -clean -cleanCache -flav=ult -ver='7.6' -dir=sugarcrm -build_dir=${BUILD_DIR}"
 
     [[ -d "${WEB_DIR}/${INSTANCE_NAME}" ]] && __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "rm -rf ${WEB_DIR}/${INSTANCE_NAME}"
     __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "mv ${BUILD_DIR}/ult/sugarcrm ${WEB_DIR}/${INSTANCE_NAME}"
