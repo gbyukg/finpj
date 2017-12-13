@@ -256,7 +256,7 @@ prepare_source_from_package()
 
     # 包安装时不需要跑 federation 脚本
     # 在最后一个包安装完成后, 跑最后一个包中的脚本
-    mv "${WEB_DIR}/${INSTANCE_NAME}"/custom/install/federated_db_environment/sql "${TMP_DIR}"/sql-back
+    # mv "${WEB_DIR}/${INSTANCE_NAME}"/custom/install/federated_db_environment/sql "${TMP_DIR}"/sql-back
 
     # 解压基础包中的 SugarInstanceManger
     __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "unzip -o ${TMP_DIR}/${base_package} \"ibm/SugarInstanceManager/*\" -d ${TMP_DIR}/ > /dev/null"
