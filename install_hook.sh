@@ -57,13 +57,14 @@ __command_logging_and_exit()
     local FUN_NAME="${1}"
     local LINE_NO="${2}"
     local cmd="${3}"
+    local print_msg="${4:-0}"
     local msg=""
 
     msg=$(2>&1 eval "${cmd}")
     return_code="$?"
 
     if [[ 0 -eq "${return_code}" ]]; then
-        [[ $(($FLAGS & $DEBUG)) -eq $DEBUG ]] && echo "${msg}"
+        [[ ${print_msg} -eq 1 || $(($FLAGS & $DEBUG)) -eq $DEBUG ]] && echo "${msg}"
         __logging "$FUN_NAME" "$LINE_NO" "SH-COMMAND:${return_code}" "${cmd}"
     else
         echo "SH-COMMAND[${return_code}] ${cmd}; Message: [${msg}]"
@@ -128,7 +129,7 @@ build_code()
     _print_msg "building code..."
     __command_logging_and_exit \
         "${FUNCNAME[0]}" "$LINENO" \
-        "cd ${GIT_DIR}/build/rome && php build.php -clean -cleanCache -flav=ult -ver='7.6' -dir=sugarcrm -build_dir=${BUILD_DIR}"
+        "cd ${GIT_DIR}/build/rome && php build.php -clean -cleanCache -flav=ult -ver='7.6' -dir=sugarcrm -build_dir=${BUILD_DIR}" 1
 
     [[ -d "${WEB_DIR}/${INSTANCE_NAME}" ]] && __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "rm -rf ${WEB_DIR}/${INSTANCE_NAME}"
     __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "mv ${BUILD_DIR}/ult/sugarcrm ${WEB_DIR}/${INSTANCE_NAME}"
