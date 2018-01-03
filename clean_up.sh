@@ -3,7 +3,9 @@
 trap 'ERRTRAP $LINENO' ERR
 
 . "${HOME}"/sqllib/db2profile
+. /etc/profile
 
+set -x
 clean_file_dir=${1:-$(date +%Y-%m-%d)}
 readonly clean_dir=${HOME}/tmp/"${clean_file_dir}"
 readonly web_dir=${HOME}/www/sales
@@ -21,7 +23,7 @@ ERRTRAP()
 drop_db()
 {
     local db_name=${1}
-    printf "Drop database %s ...\n" "${db_name}"
+    echo "Drop database %s ...\n" "${db_name}"
 
     apps=$(db2 list applications for database ${db_name})
     if [[ $? -eq 0 ]]; then
@@ -41,6 +43,7 @@ drop_db()
         db2 deactivate db "${db_name}" && \
         db2 "DROP DATABASE ${db_name}" # drop the previously existing database if it exists
     fi
+    rm -rf /home/btit/sqllib/db2dump/${db_name}.*
 }
 
 clean_logs()
@@ -72,6 +75,7 @@ echo $sugar_config['dbconfig']['db_name'];
 GET_DB_NAME
 
     db_name=$(php ${web_dir}/${del_file}/get_db_name.php)
+    echo $db_name
 
     if [[ -n $db_name && $(grep $db_name db_installed > /dev/null 2>&1; echo $?) -eq 0 ]]; then
         drop_db $db_name

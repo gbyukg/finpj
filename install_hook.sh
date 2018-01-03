@@ -893,6 +893,12 @@ after_install()
         && __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Run UnitTest" \
         && run_unittest
 
+    # run ES data
+    [[ $(($FLAGS & $INDEPENDENT_ES)) -eq $INDEPENDENT_ES ]] && {
+        echo ""
+        # php cron.php
+    }
+
     setup_webide
 
     _green_echo "Finish"
