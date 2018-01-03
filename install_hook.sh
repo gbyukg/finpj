@@ -176,7 +176,7 @@ prepare_source_from_pr()
 
         _green_echo "Fetching code ${info[1]}/${info[2]} ... "
         __logging "${FUNCNAME[0]}" "$LINENO" "[info]" "fetch ref: ${git_refs}"
-        __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "git fetch ${git_refs}" #|| __err "$LINENO" "git fetch failed."
+        __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "git fetch ${git_refs}" 1 #|| __err "$LINENO" "git fetch failed."
 
         if [[ -z "${check_ref}" ]]; then
             check_ref="${info[1]}/${middle_ref}${info[2]}"
@@ -575,6 +575,85 @@ fi
   fi
 }
 
+independent_es_setup()
+{
+    # 需要独立 ES 数据
+    _print_msg "Start ES server on port ${FTS_PORT}"
+
+    # 设置 ES 配置文件, 保存到 TMP 目录下
+    cat <<SYSCONFIG > "${TMP_DIR}"/elasticsearch.yml
+cluster.name: "${INSTANCE_NAME}"
+node.name: "${INSTANCE_NAME}"
+path.conf: "/etc/elasticsearch/"
+path.data: ${TMP_DIR}/es_data
+path.work: ${TMP_DIR}/es_data
+path.logs: ${TMP_DIR}/es_data
+http.port: ${FTS_PORT}
+SYSCONFIG
+
+    # 启动独立ES, 删除实例时务必记得终止进程
+    # BUILD_ID=dontKillMe 防止 jenkins kill
+    local es_command="BUILD_ID=dontKillMe ${ES_BINARY} -Des.config=${TMP_DIR}/elasticsearch.yml -p ${TMP_DIR}/es.pid -d"
+    __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "setup an independent ES instance on port ${FTS_PORT}"
+    __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "$es_command"
+    eval "${es_command}"
+}
+
+update_conf()
+{
+    _print_msg 'Update configuration'
+
+    __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Update sugar instance config.php"
+
+    # UNIQUE_KEY=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Generate UNIQUE_KEY: ${UNIQUE_KEY}"
+
+    # config.php DB 配置
+    __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "sed 's!\^DB_HOST\^!${DB_HOST}!g; s!\^DB_NAME\^!${DB_NAME}!g; s!\^DB_ADMIN_USR\^!${DB_ADMIN_USR}!g; s!\^DB_ADMIN_PWD\^!${DB_ADMIN_PWD}!g; s!\^SERVER_HOSTNAME\^!${WEB_HOST}!g; s!\^INSTANCE_NAME\^!${INSTANCE_NAME}!g; s!\^FULL_HOST_NAME\^!${FULL_HOST_NAME}!g; s!\^UNIQUE_KEY\^!${UNIQUE_KEY}!g' ${PROJECT_DIR}/configs/config.php > ${WEB_DIR}/${INSTANCE_NAME}/config.php"
+
+    # htaccess 配置
+    __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "sed 's/\^INSTANCE_NAME\^/${INSTANCE_NAME}/g' ./configs/htaccess > ${WEB_DIR}/${INSTANCE_NAME}/.htaccess"
+
+    generate_config_override()
+    {
+        cat << CONFIG_OVERRIDE > ${WEB_DIR}/${INSTANCE_NAME}/genConfig.php
+<?php
+ini_set('display_errors', 1);
+if(!defined('sugarEntry'))define('sugarEntry', true);
+
+require_once('include/entryPoint.php');
+include 'custom/install/SalesConnectInstaller.php';
+
+\$sugar_config = array();
+if (is_readable('config.php')) {
+    include 'config.php';
+}
+
+// update config file
+// 不能放到这里, 否则执行该脚本是数据库连接失败
+//\$sugar_config['dbconfig']['db_host_name'] = "${DB_HOST}";
+//\$sugar_config['dbconfig']['db_user_name'] = "${DB_ADMIN_PWD}";
+//\$sugar_config['dbconfig']['db_password'] = "${DB_ADMIN_USR}";
+//\$sugar_config['dbconfig']['db_name'] = "${DB_NAME}";
+//\$sugar_config['host_name'] = "${FULL_HOST_NAME}";
+//\$sugar_config['site_url'] = "${WEB_HOST}/${INSTANCE_NAME}";
+//\$sugar_config['unique_key'] = "${UNIQUE_KEY}";
+// ES
+\$sugar_config['full_text_engine']['Elastic']['host'] = "${FTS_HOST}";
+\$sugar_config['full_text_engine']['Elastic']['port'] = "${FTS_PORT}";
+
+ksort(\$configs);
+write_array_to_file("sugar_config", \$sugar_config, "config.php");
+
+SalesConnectInstaller::executeTask('UpdateConfigFile');
+CONFIG_OVERRIDE
+
+        cd "${WEB_DIR}/${INSTANCE_NAME}" || __err "$LINENO" "${WEB_DIR}/${INSTANCE_NAME} folder does not exist."
+        __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "php genConfig.php"
+    }
+    generate_config_override
+}
+
 run_qrr()
 {
     _print_msg 'Starting to run QRR...'
@@ -601,40 +680,6 @@ run_qrr()
     # QRR 结果将不作为安装流程的状态码
     curl ${WEB_HOST}
     return 0
-}
-
-update_conf()
-{
-    _print_msg 'Update configuration'
-
-    __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Update sugar instance config.php"
-
-    # UNIQUE_KEY=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-    __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Generate UNIQUE_KEY: ${UNIQUE_KEY}"
-
-    # config.php DB 配置
-    __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "sed 's!\^DB_HOST\^!${DB_HOST}!g; s!\^DB_NAME\^!${DB_NAME}!g; s!\^DB_ADMIN_USR\^!${DB_ADMIN_USR}!g; s!\^DB_ADMIN_PWD\^!${DB_ADMIN_PWD}!g; s!\^SERVER_HOSTNAME\^!${WEB_HOST}!g; s!\^INSTANCE_NAME\^!${INSTANCE_NAME}!g; s!\^FULL_HOST_NAME\^!${FULL_HOST_NAME}!g; s!\^UNIQUE_KEY\^!${UNIQUE_KEY}!g' ${PROJECT_DIR}/configs/config.php > ${WEB_DIR}/${INSTANCE_NAME}/config.php"
-
-    # htaccess 配置
-    __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "sed 's/\^INSTANCE_NAME\^/${INSTANCE_NAME}/g' ./configs/htaccess > ${WEB_DIR}/${INSTANCE_NAME}/.htaccess"
-
-    generate_config_override()
-    {
-        cat <<CONFIG_OVERRIDE > ${WEB_DIR}/${INSTANCE_NAME}/gen_config_override.php
-<?php
-ini_set('display_errors', 1);
-if(!defined('sugarEntry'))define('sugarEntry', true);
-
-require_once('include/entryPoint.php');
-include 'custom/install/SalesConnectInstaller.php';
-
-SalesConnectInstaller::executeTask('UpdateConfigFile');
-CONFIG_OVERRIDE
-
-        cd "${WEB_DIR}/${INSTANCE_NAME}" || __err "$LINENO" "${WEB_DIR}/${INSTANCE_NAME} folder does not exist."
-        __command_logging_and_exit "${FUNCNAME[0]}" "$LINENO" "php gen_config_override.php"
-    }
-    generate_config_override
 }
 
 run_dataloader()
@@ -719,10 +764,14 @@ before_install()
 {
     _print_msg 'Run Hook [before install]'
 
+    # custome ES instance
+    [[ $(($FLAGS & $INDEPENDENT_ES)) -eq $INDEPENDENT_ES ]] && independent_es_setup
+
     [[ $(($FLAGS & $INIT_DB)) -eq $INIT_DB ]] && init_db
 
     # restore database
     # RESTORE_INSTALL 为0, 需要使用 FULL_INSTALL 做比较
+    # 复制安装方式
     if [[ $(($FLAGS & $FULL_INSTALL)) -ne $FULL_INSTALL ]]; then
         __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "The instance is installed from restore"
 

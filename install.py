@@ -76,6 +76,12 @@ class Install(object):
             "{:s}/ibm/dataloaders".format(self.install_config['git_dir'])  # git dataloader
             )[self.install_config['flags'] & install_flgs.source_from_git]
 
+        # independent_es 环境变量
+        if install_flgs.independent_es:
+            cus_fts_port = str(os.environ.get("BUILD_ID", '00'))[-2:].zfill(2)
+            self.install_config["fts_port"] = "92{0:s}".format(cus_fts_port)
+            self.install_config["independent_es"] = 1
+
         # 将配置文件写入到文件中, 当做环境变量传递给shell脚本
         env_file = "{:s}/env.sh".format(self.install_config['tmp_dir'])
         fh = open(env_file, "w+", buffering=1)
