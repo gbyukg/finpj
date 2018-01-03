@@ -856,6 +856,36 @@ setup_webide()
     mkdir "${IN_WEBIDE}"/workspace && ln -s  "${WEB_DIR}/${INSTANCE_NAME}" "${IN_WEBIDE}/workspace/sc"
 }
 
+generate_es_data()
+{
+    _print_msg "Generating ES data..."
+    __logging "${FUNCNAME[0]}" "$LINENO" "INFO" "Run hook [generate_es_data]"
+
+    cd "${WEB_DIR}/${INSTANCE_NAME}"
+
+    cat << 'SCHEDULE_ES_DATA' > schedule_search_index.php
+<?php
+if(!defined('sugarEntry'))define('sugarEntry', true);
+require_once('include/entryPoint.php');
+$clearData = true; // will erase existing index data when true
+$modules = array(); // will pull all active modules when empty, or you can specify module names
+$indexerClass = 'SugarSearchEngineFullIndexer';
+SugarAutoLoader::requireWithCustom('include/SugarSearchEngine/SugarSearchEngineFullIndexer.php');
+if (class_exists(SugarAutoLoader::customClass($indexerClass))) {
+    $indexerClass = SugarAutoLoader::customClass($indexerClass);
+}
+$indexer = new $indexerClass();
+$indexer->initiateFTSIndexer($modules, $clearData);
+$_REQUEST['enabled_modules'] = 'Accounts,Calls,Cases,Contacts,Documents,Leads,Meetings,Notes,ibm_RevenueLineItems,Opportunities,Users,Tasks,Employees';
+require_once('modules/Home/UnifiedSearchAdvanced.php');
+$unifiedSearchAdvanced = new UnifiedSearchAdvanced();
+$unifiedSearchAdvanced->saveGlobalSearchSettings();
+SCHEDULE_ES_DATA
+
+    php schedule_search_index.php
+    php cron.php
+}
+
 after_install()
 {
     # 升级补丁包 如果与 git 比较结果为0, 则是包安装
@@ -894,10 +924,7 @@ after_install()
         && run_unittest
 
     # run ES data
-    [[ $(($FLAGS & $INDEPENDENT_ES)) -eq $INDEPENDENT_ES ]] && {
-        echo ""
-        # php cron.php
-    }
+    [[ $(($FLAGS & $INDEPENDENT_ES)) -eq $INDEPENDENT_ES ]] && generate_es_data
 
     setup_webide
 
